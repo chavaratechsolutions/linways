@@ -56,13 +56,13 @@ export default function LoginPage() {
     if (authLoading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+        <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-gray-50 p-4">
             <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-xl">
                 <div className="text-center">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-600">
                         <LogIn className="h-8 w-8" />
                     </div>
-                    <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Sign in to LMS</h2>
+                    <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Sign in to HR Management System</h2>
                     <p className="mt-2 text-sm text-gray-600">Enter your credentials to access your dashboard</p>
                 </div>
 

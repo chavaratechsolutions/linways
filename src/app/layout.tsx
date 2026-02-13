@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "Modern HR Management System for Staff and Admin",
   icons: {
     icon: "/img/carmellogo_s.png",
+    shortcut: "/img/carmellogo_s.png",
+    apple: "/img/carmellogo_s.png",
   },
 };
 
