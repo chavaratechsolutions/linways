@@ -16,12 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "HR Management System",
   description: "Modern HR Management System for Staff and Admin",
-  //manifest: "/manifest.json",
-  icons: {
-    icon: "/img/carmellogo_s.png?v=2",
-    shortcut: "/img/carmellogo_s.png?v=2",
-    apple: "/img/carmellogo_s.png?v=2",
-  },
+  manifest: "/manifest.json",
 };
 
 import Header from "@/components/Header";
