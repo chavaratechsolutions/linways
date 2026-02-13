@@ -50,7 +50,7 @@ export default function DirectorDashboard() {
             <div className="space-y-6">
                 <div>
                     <h1 className="text-xl md:text-2xl font-bold text-gray-900">Director Dashboard</h1>
-                    <p className="text-sm text-gray-500">Welcome to the LMS director portal.</p>
+                    <p className="text-sm text-gray-500">Welcome to the HR Management System director portal.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 md:gap-6">

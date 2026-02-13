@@ -14,9 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LMS - Leave Management System",
-  description: "Modern Leave Management System for Staff and Admin",
+  title: "HR Management System",
+  description: "Modern HR Management System for Staff and Admin",
+  icons: {
+    icon: "/img/carmellogo_s.png",
+  },
 };
+
+import Header from "@/components/Header";
 
 export default function RootLayout({
   children,
@@ -29,6 +34,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
+          <Header />
           {children}
         </AuthProvider>
       </body>

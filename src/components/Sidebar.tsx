@@ -131,7 +131,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6">
-                    <span className="text-xl font-bold text-blue-600 tracking-tight">LMS Portal</span>
+                    <span className="text-lg font-bold text-blue-600 tracking-tight">HR Management System</span>
                     <button
                         className="lg:hidden p-1 rounded-md text-gray-500 hover:bg-gray-100"
                         onClick={() => setIsOpen(false)}

@@ -113,7 +113,7 @@ export default function DashboardLayout({ children, allowedRole }: DashboardLayo
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Mobile Header */}
                 <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:hidden shrink-0">
-                    <span className="text-lg font-bold text-blue-600">LMS Portal</span>
+                    <span className="text-lg font-bold text-blue-600">HR Management System</span>
                     <button
                         onClick={() => setIsSidebarOpen(true)}
                         className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
