@@ -1,0 +1,61 @@
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Function to get the user's role from their document (safely)
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Function to check if user is an admin or director or principal
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'admin' || 
+        getUserData().role == 'dir' ||
+        getUserData().role == 'princi' ||
+        getUserData().role == 'hod'
+      );
+    }
+
+    function isStaff() {
+       return isAuthenticated() && (
+        getUserData().role == 'staff' || 
+        getUserData().role == 'princi'
+      );
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Users can only read their own profile, Admins can read all
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      // ONLY admins can create or update users (prevents role escalation)
+      allow write: if isAdmin();
+    }
+
+    // Rules for the 'leaves' collection
+    match /leaves/{leaveId} {
+      // Staff can read their own leaves, Admins can read all
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Staff can create leaves if:
+      // 1. They are authenticated
+      // 2. The UID matches their own
+      // 3. The initial status is 'Pending' (Prevents auto-approving their own leave)
+      allow create: if isAuthenticated() && (
+        (request.resource.data.userId == request.auth.uid && request.resource.data.status == 'Pending') ||
+        isAdmin()
+      );
+      
+      // ONLY admins can update a leave (for approving/rejecting)
+      allow update: if isAdmin();
+      
+      // Admins can delete if needed, staff cannot
+      allow delete: if isAdmin();
+    }
+  }
+}
