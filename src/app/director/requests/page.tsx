@@ -36,6 +36,7 @@ function AdminRequestManagerContent() {
     const statusParam = searchParams.get("status") || "Pending";
     const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected" | "Recommended">(statusParam as any);
     const [searchTerm, setSearchTerm] = useState("");
+    const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
     useEffect(() => {
         if (["All", "Pending", "Approved", "Rejected", "Recommended"].includes(statusParam)) {
@@ -114,6 +115,8 @@ function AdminRequestManagerContent() {
             const leaveRef = doc(db, "leaves", id);
             if (status === "Recommended") {
                 await updateDoc(leaveRef, { status, recommendedBy: "Director" });
+                setShowSuccessPopup(true);
+                setTimeout(() => setShowSuccessPopup(false), 3000);
             } else {
                 await updateDoc(leaveRef, { status });
             }
@@ -365,6 +368,26 @@ function AdminRequestManagerContent() {
                     </div>
                 </div>
             </div>
+
+            {showSuccessPopup && (
+                <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="bg-white border border-blue-100 shadow-lg rounded-xl p-4 flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                            <Check className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-gray-900">Recommended</h4>
+                            <p className="text-sm text-gray-500">Leave request recommended successfully.</p>
+                        </div>
+                        <button
+                            onClick={() => setShowSuccessPopup(false)}
+                            className="ml-2 text-gray-400 hover:text-gray-600"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
