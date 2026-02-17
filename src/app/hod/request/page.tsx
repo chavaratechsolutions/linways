@@ -21,6 +21,52 @@ export default function LeaveRequestPage() {
         description: "",
     });
 
+    // Helper to check if a date is today
+    const isToday = (dateString: string) => {
+        if (!dateString) return false;
+        const today = new Date();
+        const date = new Date(dateString);
+        return date.getDate() === today.getDate() &&
+            date.getMonth() === today.getMonth() &&
+            date.getFullYear() === today.getFullYear();
+    };
+
+    const getAvailableSessions = (dateString: string) => {
+        const allSessions = ["Full Day", "Forenoon", "Afternoon"];
+        if (!dateString) return allSessions;
+
+        if (isToday(dateString)) {
+            const now = new Date();
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            const limit830 = 8 * 60 + 30;  // 8:30 AM
+            const limit1230 = 12 * 60 + 30; // 12:30 PM
+
+            // If time > 12:30 PM, restrict ALL sessions (Day blocked)
+            if (currentMinutes > limit1230) {
+                return [];
+            }
+
+            // If time > 8:30 AM, restrict Full Day and Forenoon -> Only Afternoon allowed
+            if (currentMinutes > limit830) {
+                return ["Afternoon"];
+            }
+        }
+        return allSessions;
+    };
+
+    const getMinDate = () => {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const limit1230 = 12 * 60 + 30; // 12:30 PM
+
+        // If after 12:30 PM, add 1 day to minimum date
+        if (currentMinutes > limit1230) {
+            now.setDate(now.getDate() + 1);
+        }
+
+        return now.toISOString().split('T')[0];
+    };
+
     const calculateLeaveValue = () => {
         if (formData.session === "Forenoon" || formData.session === "Afternoon") {
             return 0.5;
@@ -44,10 +90,31 @@ export default function LeaveRequestPage() {
         if (formData.fromDate && formData.toDate) {
             const start = parseISO(formData.fromDate);
             const end = parseISO(formData.toDate);
+
+            // Basic date validation
             if (differenceInDays(end, start) < 0) {
                 alert("End date cannot be before start date.");
                 setLoading(false);
                 return;
+            }
+
+            // Prevent past dates
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (start < today) {
+                alert("Cannot apply for leave in the past.");
+                setLoading(false);
+                return;
+            }
+
+            // Time-based validation for current day
+            if (isToday(formData.fromDate)) {
+                const availableSessions = getAvailableSessions(formData.fromDate);
+                if (!availableSessions.includes(formData.session)) {
+                    alert(`Cannot apply for ${formData.session} at this time.`);
+                    setLoading(false);
+                    return;
+                }
             }
         }
 
@@ -105,9 +172,9 @@ export default function LeaveRequestPage() {
                                 value={formData.session}
                                 onChange={(e) => setFormData({ ...formData, session: e.target.value })}
                             >
-                                <option>Full Day</option>
-                                <option>Forenoon</option>
-                                <option>Afternoon</option>
+                                {getAvailableSessions(formData.fromDate).map(session => (
+                                    <option key={session} value={session}>{session}</option>
+                                ))}
                             </select>
                         </div>
 
@@ -117,13 +184,19 @@ export default function LeaveRequestPage() {
                                 type="date"
                                 required
                                 className="w-full rounded-xl border border-gray-300 px-4 py-2.5 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-shadow outline-none text-gray-900"
+                                min={getMinDate()}
                                 value={formData.fromDate}
                                 onChange={(e) => {
                                     const newDate = e.target.value;
+                                    // Check if current session is valid for new date, if not reset to first available
+                                    const available = getAvailableSessions(newDate);
+                                    const newSession = available.includes(formData.session) ? formData.session : available[0];
+
                                     setFormData({
                                         ...formData,
                                         fromDate: newDate,
-                                        toDate: formData.session !== "Full Day" ? newDate : formData.toDate
+                                        session: newSession,
+                                        toDate: newSession !== "Full Day" ? newDate : formData.toDate
                                     });
                                 }}
                             />
@@ -134,6 +207,7 @@ export default function LeaveRequestPage() {
                             <input
                                 type="date"
                                 required
+                                min={formData.fromDate || getMinDate()}
                                 disabled={formData.session !== "Full Day"}
                                 className="w-full rounded-xl border border-gray-300 px-4 py-2.5 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-shadow outline-none text-gray-900 disabled:bg-gray-50 disabled:text-gray-400"
                                 value={formData.session !== "Full Day" ? formData.fromDate : formData.toDate}
