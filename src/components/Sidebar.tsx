@@ -103,6 +103,12 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             { name: "Add Leave", href: "/admin/add-leave", icon: FilePlus },
             { name: "Bulk Leave Upload", href: "/admin/leaves/bulk", icon: FileUp }
         );
+    } else if (role === "hod" || role === "princi" || role === "dir") {
+        adminLinks.push({
+            name: "Change Password",
+            href: role === "hod" ? "/hod/change-password" : role === "princi" ? "/principal/change-password" : "/director/change-password",
+            icon: Lock
+        });
     }
 
     if (role === "hod") {
