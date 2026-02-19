@@ -111,9 +111,19 @@ export default function StaffHistoryPage() {
                                     <span className="text-xs text-gray-400">
                                         {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
                                     </span>
-                                    <span className="text-xs font-semibold text-blue-600 uppercase">
-                                        {leave.leaveValue} Day(s)
-                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-semibold text-blue-600 uppercase">
+                                            {leave.leaveValue} Day(s)
+                                        </span>
+                                        {leave.status === "Pending" && (
+                                            <a
+                                                href={`/staff/edit/${leave.id}`}
+                                                className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                            >
+                                                Edit
+                                            </a>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))
@@ -159,6 +169,18 @@ export default function StaffHistoryPage() {
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(leave.status)}`}>
                                                     {leave.status}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {leave.status === "Pending" ? (
+                                                    <a
+                                                        href={`/staff/edit/${leave.id}`}
+                                                        className="inline-block px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        Edit
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 italic">No actions</span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))

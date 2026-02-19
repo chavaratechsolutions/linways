@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, use } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
 
-export default function LeaveRequestPage() {
+export default function EditLeavePage({ params }: { params: Promise<{ id: string }> }) {
     const { user } = useAuth();
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    // Unwrap params using use() hook
+    const resolvedParams = use(params);
+    const id = resolvedParams.id;
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         type: "Casual Leave",
         fromDate: "",
@@ -20,6 +24,49 @@ export default function LeaveRequestPage() {
         reason: "",
         description: "",
     });
+
+    useEffect(() => {
+        const fetchLeave = async () => {
+            if (!user || !id) return;
+
+            try {
+                const docRef = doc(db, "leaves", id);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.userId !== user.uid) {
+                        alert("Unauthorized access.");
+                        router.push("/staff/history");
+                        return;
+                    }
+                    if (data.status !== "Pending") {
+                        alert("Cannot edit leave requests that are not Pending.");
+                        router.push("/staff/history");
+                        return;
+                    }
+                    setFormData({
+                        type: data.type,
+                        fromDate: data.fromDate,
+                        toDate: data.toDate,
+                        session: data.session,
+                        reason: data.reason,
+                        description: data.description || "",
+                    });
+                } else {
+                    alert("Leave request not found.");
+                    router.push("/staff/history");
+                }
+            } catch (error) {
+                console.error("Error fetching leave:", error);
+                alert("Failed to load leave details.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchLeave();
+    }, [user, id, router]);
 
     // Helper to check if a date is today
     const isToday = (dateString: string) => {
@@ -81,11 +128,6 @@ export default function LeaveRequestPage() {
     };
 
     const checkDuplicateLeave = async (start: Date, end: Date) => {
-        // Create query for overlapping dates
-        // We need to check if there are any leaves where:
-        // (existingStart <= newEnd) AND (existingEnd >= newStart)
-        // AND status is not "Rejected"
-
         const leavesRef = collection(db, "leaves");
         const q = query(
             leavesRef,
@@ -96,32 +138,24 @@ export default function LeaveRequestPage() {
         const querySnapshot = await getDocs(q);
 
         for (const doc of querySnapshot.docs) {
+            // Exclude current document from check
+            if (doc.id === id) continue;
+
             const data = doc.data();
             const existingStart = parseISO(data.fromDate);
             const existingEnd = parseISO(data.toDate);
 
             // Check overlap
             if (existingStart <= end && existingEnd >= start) {
-                console.log("Overlap found with doc:", doc.id);
-                console.log("Existing Session (DB):", data.session);
-                console.log("New Session (Form):", formData.session);
-
                 // If either is Full Day, it's an overlap
                 if (data.session === "Full Day" || formData.session === "Full Day") {
-                    console.log("Blocking: Full Day conflict");
                     return true;
                 }
 
                 // If both are exact same session (e.g. Forenoon & Forenoon), it's an overlap
                 if (data.session === formData.session) {
-                    console.log("Blocking: Same session conflict");
                     return true;
                 }
-
-                console.log("Allowing: Complementary sessions");
-                // If we get here:
-                // One is Forenoon, one is Afternoon -> ALLOW (return false for this doc)
-                // Continue checking other docs just in case
             }
         }
         return false;
@@ -129,58 +163,60 @@ export default function LeaveRequestPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user) return;
+        console.log("Submitting update for ID:", id);
+        console.log("User ID:", user?.uid);
 
-        setLoading(true);
+        if (!user || !id) {
+            console.error("Missing user or ID");
+            return;
+        }
+
+        setSubmitting(true);
 
         // Validation
         if (formData.fromDate && formData.toDate) {
             const start = parseISO(formData.fromDate);
             const end = parseISO(formData.toDate);
 
-            // Basic date validation
             if (differenceInDays(end, start) < 0) {
                 alert("End date cannot be before start date.");
-                setLoading(false);
+                setSubmitting(false);
                 return;
             }
 
-            // Prevent past dates
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             if (start < today) {
                 alert("Cannot apply for leave in the past.");
-                setLoading(false);
+                setSubmitting(false);
                 return;
             }
 
-            // Time-based validation for current day
             if (isToday(formData.fromDate)) {
                 const availableSessions = getAvailableSessions(formData.fromDate);
                 if (!availableSessions.includes(formData.session)) {
                     alert(`Cannot apply for ${formData.session} at this time.`);
-                    setLoading(false);
+                    setSubmitting(false);
                     return;
                 }
             }
 
-            // Check for duplicate leave
             try {
                 const isDuplicate = await checkDuplicateLeave(start, end);
                 if (isDuplicate) {
                     alert("You have already applied for leave on these dates.");
-                    setLoading(false);
+                    setSubmitting(false);
                     return;
                 }
             } catch (error: any) {
                 if (error.code === 'failed-precondition' && error.message.includes('index')) {
-                    console.error("Firestore Index Required. Please create it here:", error.message);
-                    alert("System configuration required. Please check the browser console for a link to fix this.");
+                    console.error("Firestore Index Required:", error.message);
+                    alert("System configuration required. Please check console.");
                 } else {
-                    console.error("Error checking for duplicate leave:", error);
-                    alert("Failed to check for duplicate leave. Please try again.");
+                    console.error("Error checking duplicate:", error);
+                    alert("Failed to check duplicate leave.");
                 }
-                setLoading(false);
+                setSubmitting(false);
                 return;
             }
         }
@@ -188,30 +224,29 @@ export default function LeaveRequestPage() {
         const leaveValue = calculateLeaveValue();
 
         try {
-            const dataToSave = {
+            const docRef = doc(db, "leaves", id);
+            await updateDoc(docRef, {
                 ...formData,
-                userId: user.uid,
-                userEmail: user.email,
                 leaveValue,
-                status: "Recommended",
-                recommendedBy: "HOD",
-                createdAt: serverTimestamp(),
-            };
-
-            await addDoc(collection(db, "leaves"), dataToSave);
-            router.push("/hod/history");
+                updatedAt: serverTimestamp(),
+            });
+            router.push("/staff/history");
         } catch (error) {
-            console.error("Error submitting leave:", error);
-            alert("Failed to submit request.");
+            console.error("Error updating leave:", error);
+            alert("Failed to update request.");
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
+    if (loading) {
+        return <DashboardLayout allowedRole="staff"><div className="p-10 text-center">Loading...</div></DashboardLayout>;
+    }
+
     return (
-        <DashboardLayout allowedRole="hod">
+        <DashboardLayout allowedRole="staff">
             <div className="max-w-2xl mx-auto pb-10">
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 px-1">Request Leave</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 px-1">Edit Leave Request</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-6 bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-gray-100">
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -255,7 +290,6 @@ export default function LeaveRequestPage() {
                                 value={formData.fromDate}
                                 onChange={(e) => {
                                     const newDate = e.target.value;
-                                    // Check if current session is valid for new date, if not reset to first available
                                     const available = getAvailableSessions(newDate);
                                     const newSession = available.includes(formData.session) ? formData.session : available[0];
 
@@ -311,18 +345,27 @@ export default function LeaveRequestPage() {
                         <span className="text-2xl font-black text-blue-800">{calculateLeaveValue()}</span>
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all hover:-translate-y-0.5"
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2">
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                submitting...
-                            </span>
-                        ) : "Submit Leave Request"}
-                    </button>
+                    <div className="flex gap-4">
+                        <button
+                            type="button"
+                            onClick={() => router.back()}
+                            className="w-1/3 py-3.5 px-4 border border-gray-300 rounded-xl shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="w-2/3 flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all hover:-translate-y-0.5"
+                        >
+                            {submitting ? (
+                                <span className="flex items-center gap-2">
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                    Updating...
+                                </span>
+                            ) : "Update Request"}
+                        </button>
+                    </div>
                 </form>
             </div>
         </DashboardLayout>

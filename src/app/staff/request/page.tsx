@@ -3,7 +3,7 @@
 import { useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
@@ -80,6 +80,53 @@ export default function LeaveRequestPage() {
         return 0;
     };
 
+    const checkDuplicateLeave = async (start: Date, end: Date) => {
+        // Create query for overlapping dates
+        // We need to check if there are any leaves where:
+        // (existingStart <= newEnd) AND (existingEnd >= newStart)
+        // AND status is not "Rejected"
+
+        const leavesRef = collection(db, "leaves");
+        const q = query(
+            leavesRef,
+            where("userId", "==", user?.uid),
+            where("status", "!=", "Rejected")
+        );
+
+        const querySnapshot = await getDocs(q);
+
+        for (const doc of querySnapshot.docs) {
+            const data = doc.data();
+            const existingStart = parseISO(data.fromDate);
+            const existingEnd = parseISO(data.toDate);
+
+            // Check overlap
+            if (existingStart <= end && existingEnd >= start) {
+                console.log("Overlap found with doc:", doc.id);
+                console.log("Existing Session (DB):", data.session);
+                console.log("New Session (Form):", formData.session);
+
+                // If either is Full Day, it's an overlap
+                if (data.session === "Full Day" || formData.session === "Full Day") {
+                    console.log("Blocking: Full Day conflict");
+                    return true;
+                }
+
+                // If both are exact same session (e.g. Forenoon & Forenoon), it's an overlap
+                if (data.session === formData.session) {
+                    console.log("Blocking: Same session conflict");
+                    return true;
+                }
+
+                console.log("Allowing: Complementary sessions");
+                // If we get here:
+                // One is Forenoon, one is Afternoon -> ALLOW (return false for this doc)
+                // Continue checking other docs just in case
+            }
+        }
+        return false;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
@@ -115,6 +162,26 @@ export default function LeaveRequestPage() {
                     setLoading(false);
                     return;
                 }
+            }
+
+            // Check for duplicate leave
+            try {
+                const isDuplicate = await checkDuplicateLeave(start, end);
+                if (isDuplicate) {
+                    alert("You have already applied for leave on these dates.");
+                    setLoading(false);
+                    return;
+                }
+            } catch (error: any) {
+                if (error.code === 'failed-precondition' && error.message.includes('index')) {
+                    console.error("Firestore Index Required. Please create it here:", error.message);
+                    alert("System configuration required. Please check the browser console for a link to fix this.");
+                } else {
+                    console.error("Error checking for duplicate leave:", error);
+                    alert("Failed to check for duplicate leave. Please try again.");
+                }
+                setLoading(false);
+                return;
             }
         }
 
