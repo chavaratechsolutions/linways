@@ -45,8 +45,12 @@ export default function HodHistoryPage() {
             })) as LeaveRequest[];
 
             leavesData.sort((a, b) => {
-                const timeA = a.createdAt?.seconds || new Date(a.fromDate || 0).getTime();
-                const timeB = b.createdAt?.seconds || new Date(b.fromDate || 0).getTime();
+                const timeA = a.createdAt && typeof a.createdAt.toMillis === 'function'
+                    ? a.createdAt.toMillis()
+                    : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.fromDate || 0).getTime());
+                const timeB = b.createdAt && typeof b.createdAt.toMillis === 'function'
+                    ? b.createdAt.toMillis()
+                    : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.fromDate || 0).getTime());
                 return timeB - timeA;
             });
 

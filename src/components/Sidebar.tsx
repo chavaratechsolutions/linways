@@ -120,6 +120,15 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
     const links = (role === "admin" || role === "dir" || role === "princi" || role === "hod") ? adminLinks : staffLinks;
 
+    let dashboardHref = "/";
+    if (user) {
+        if (role === "admin") dashboardHref = "/admin";
+        else if (role === "dir") dashboardHref = "/director";
+        else if (role === "princi") dashboardHref = "/principal";
+        else if (role === "hod") dashboardHref = "/hod";
+        else dashboardHref = "/staff";
+    }
+
     return (
         <>
             {/* Mobile Overlay */}
@@ -137,7 +146,9 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6">
-                    <span className="text-lg font-bold text-blue-600 tracking-tight">HR Management System</span>
+                    <Link href={dashboardHref} onClick={() => setIsOpen(false)}>
+                        <span className="text-lg font-bold text-blue-600 tracking-tight hover:text-blue-700 transition-colors">HR Management System</span>
+                    </Link>
                     <button
                         className="lg:hidden p-1 rounded-md text-gray-500 hover:bg-gray-100"
                         onClick={() => setIsOpen(false)}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import { Menu } from "lucide-react";
+import Link from "next/link";
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -71,6 +72,16 @@ export default function DashboardLayout({ children, allowedRole }: DashboardLayo
 
     // If role mismatch
     const isStaffAccessingStaff = allowedRole === "staff" && (role === "princi" || role === "dir" || role === "hod");
+
+    let dashboardHref = "/";
+    if (user) {
+        if (role === "admin") dashboardHref = "/admin";
+        else if (role === "dir") dashboardHref = "/director";
+        else if (role === "princi") dashboardHref = "/principal";
+        else if (role === "hod") dashboardHref = "/hod";
+        else dashboardHref = "/staff";
+    }
+
     // We are strict now: princi must be on allowedRole="princi", dir on "dir".
 
     if (allowedRole && role !== allowedRole && !isStaffAccessingStaff) {
@@ -113,7 +124,9 @@ export default function DashboardLayout({ children, allowedRole }: DashboardLayo
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Mobile Header */}
                 <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:hidden shrink-0">
-                    <span className="text-lg font-bold text-blue-600">HR Management System</span>
+                    <Link href={dashboardHref}>
+                        <span className="text-lg font-bold text-blue-600 hover:text-blue-700 transition-colors">HR Management System</span>
+                    </Link>
                     <button
                         onClick={() => setIsSidebarOpen(true)}
                         className="p-2 rounded-md text-gray-500 hover:bg-gray-100"

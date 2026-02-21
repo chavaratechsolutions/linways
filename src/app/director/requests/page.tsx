@@ -243,8 +243,8 @@ function AdminRequestManagerContent() {
                                     </div>
                                     <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">
                                         <p className="font-semibold text-xs uppercase text-blue-600 mb-1">{leave.type} ({leave.leaveValue} Days)</p>
-                                        <p className="font-medium">{leave.reason}</p>
-                                        <p className="text-xs mt-1 italic line-clamp-2">{leave.description}</p>
+                                        <p className="font-medium break-words">{leave.reason}</p>
+                                        <p className="text-xs mt-1 italic break-words">{leave.description}</p>
                                     </div>
                                     <div className="text-xs text-gray-400">
                                         {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
@@ -319,9 +319,9 @@ function AdminRequestManagerContent() {
                                                     <div className="text-xs text-blue-600 font-semibold uppercase">{leave.leaveValue} Day(s) - {leave.session}</div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="max-w-[200px]">
-                                                        <p className="text-sm text-gray-900 font-medium truncate" title={leave.reason}>{leave.reason}</p>
-                                                        <p className="text-xs text-gray-500 line-clamp-2 mt-0.5" title={leave.description}>{leave.description}</p>
+                                                    <div className="min-w-[200px] max-w-sm">
+                                                        <p className="text-sm text-gray-900 font-medium break-words" title={leave.reason}>{leave.reason}</p>
+                                                        <p className="text-xs text-gray-500 mt-0.5 break-words" title={leave.description}>{leave.description}</p>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-gray-600">

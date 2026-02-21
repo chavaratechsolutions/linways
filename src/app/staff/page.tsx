@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
+import Link from "next/link";
 import { LEAVE_LIMITS, LeaveType } from "@/lib/constants";
 
 interface LeaveRequest {
@@ -19,6 +20,7 @@ interface LeaveRequest {
     fromDate: string;
     toDate: string;
     leaveValue?: number;
+    session?: string;
     createdAt?: Timestamp;
 }
 
@@ -68,14 +70,22 @@ function StaffDashboardContent() {
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
+            if (snapshot.metadata.fromCache && snapshot.empty) {
+                return; // Ignore empty cache to wait for server data
+            }
+
             const leavesData = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             })) as LeaveRequest[];
 
             leavesData.sort((a, b) => {
-                const timeA = a.createdAt?.seconds || 0;
-                const timeB = b.createdAt?.seconds || 0;
+                const timeA = a.createdAt && typeof a.createdAt.toMillis === 'function'
+                    ? a.createdAt.toMillis()
+                    : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.fromDate || 0).getTime());
+                const timeB = b.createdAt && typeof b.createdAt.toMillis === 'function'
+                    ? b.createdAt.toMillis()
+                    : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.fromDate || 0).getTime());
                 return timeB - timeA;
             });
 
@@ -99,10 +109,10 @@ function StaffDashboardContent() {
     }, [user]);
 
     const statCards = [
-        { name: "Total Requests", value: stats.total, icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-100" },
-        { name: "Pending", value: stats.pending, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-100" },
-        { name: "Approved", value: stats.approved, icon: CheckCircle, color: "text-green-600", bg: "bg-green-100" },
-        { name: "Rejected", value: stats.rejected, icon: XCircle, color: "text-red-600", bg: "bg-red-100" },
+        { name: "Total Requests", value: loading ? "..." : stats.total, icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-100", href: "/staff/history" },
+        { name: "Pending", value: loading ? "..." : stats.pending, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-100", href: "/staff/history" },
+        { name: "Approved", value: loading ? "..." : stats.approved, icon: CheckCircle, color: "text-green-600", bg: "bg-green-100", href: "/staff/history" },
+        { name: "Rejected", value: loading ? "..." : stats.rejected, icon: XCircle, color: "text-red-600", bg: "bg-red-100", href: "/staff/history" },
     ];
 
     return (
@@ -139,7 +149,7 @@ function StaffDashboardContent() {
 
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 md:gap-6">
                     {statCards.map((stat) => (
-                        <div key={stat.name} className="flex flex-col md:flex-row items-center rounded-xl bg-white p-4 md:p-6 shadow-sm border border-gray-100 gap-2 md:gap-4">
+                        <Link href={stat.href} key={stat.name} className="flex flex-col md:flex-row items-center rounded-xl bg-white p-4 md:p-6 shadow-sm border border-gray-100 gap-2 md:gap-4 hover:shadow-md transition-shadow cursor-pointer">
                             <div className={`flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-lg shrink-0 ${stat.bg} ${stat.color}`}>
                                 <stat.icon className="h-5 w-5 md:h-6 md:w-6" />
                             </div>
@@ -147,7 +157,7 @@ function StaffDashboardContent() {
                                 <p className="text-[10px] md:text-sm font-medium text-gray-500 uppercase tracking-tight truncate">{stat.name}</p>
                                 <p className="text-lg md:text-2xl font-bold text-gray-900 leading-tight">{stat.value}</p>
                             </div>
-                        </div>
+                        </Link>
                     ))}
                 </div>
 
@@ -206,6 +216,8 @@ function StaffDashboardContent() {
                                     <tr>
                                         <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Type</th>
                                         <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Dates</th>
+                                        <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Duration</th>
+                                        <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Session</th>
                                         <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Status</th>
                                     </tr>
                                 </thead>
@@ -215,6 +227,12 @@ function StaffDashboardContent() {
                                             <td className="px-4 py-3 text-sm font-medium text-gray-900">{leave.type}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600">
                                                 {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-600">
+                                                {leave.leaveValue} Day(s)
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-600">
+                                                {leave.session || "-"}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-0.5 rounded text-[10px] md:text-xs font-medium ${leave.status === "Approved" ? "bg-green-100 text-green-700" :
