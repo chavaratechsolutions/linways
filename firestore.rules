@@ -51,9 +51,17 @@ service cloud.firestore {
         isAdmin()
       );
       
-      // ONLY admins can update a leave (for approving/rejecting)
-      // Users can update their own leave (checking ownership only)
-      allow update: if isAdmin() || (resource.data.userId == request.auth.uid);
+      // ONLY admins can update a leave entirely (for approving/rejecting)
+      // Staff can update their own leave ONLY if:
+      // 1. The leave is currently 'Pending'
+      // 2. They are NOT trying to change the status
+      // 3. They are NOT trying to change the userId
+      allow update: if isAdmin() || (
+        resource.data.userId == request.auth.uid && 
+        resource.data.status == 'Pending' &&
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.userId == resource.data.userId
+      );
       
       // Admins can delete if needed, staff cannot
       allow delete: if isAdmin();
