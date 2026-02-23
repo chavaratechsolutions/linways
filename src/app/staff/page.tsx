@@ -210,43 +210,73 @@ function StaffDashboardContent() {
                             No leave requests found.
                         </div>
                     ) : (
-                        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-                            <table className="w-full text-left border-collapse min-w-[300px]">
-                                <thead className="bg-gray-50 border-b border-gray-100">
-                                    <tr>
-                                        <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Type</th>
-                                        <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Dates</th>
-                                        <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Duration</th>
-                                        <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Session</th>
-                                        <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {leaves.slice(0, 5).map((leave) => (
-                                        <tr key={leave.id}>
-                                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{leave.type}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">
-                                                {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">
-                                                {leave.leaveValue} Day(s)
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">
-                                                {leave.session || "-"}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] md:text-xs font-medium ${leave.status === "Approved" ? "bg-green-100 text-green-700" :
-                                                    leave.status === "Rejected" ? "bg-red-100 text-red-700" :
-                                                        leave.status === "Recommended" ? "bg-blue-100 text-blue-700" :
-                                                            "bg-yellow-100 text-yellow-700"
-                                                    }`}>
-                                                    {leave.status}
-                                                </span>
-                                            </td>
+                        <div className="flex flex-col gap-4">
+                            {/* Mobile View - Cards */}
+                            <div className="md:hidden space-y-3">
+                                {leaves.slice(0, 5).map((leave) => (
+                                    <div key={leave.id} className="bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col gap-3">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <span className="font-semibold text-gray-900 text-sm block truncate">{leave.type}</span>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} &bull; {leave.leaveValue} Day(s)
+                                                </p>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium shrink-0 ${leave.status === "Approved" ? "bg-green-100 text-green-700" :
+                                                leave.status === "Rejected" ? "bg-red-100 text-red-700" :
+                                                    leave.status === "Recommended" ? "bg-blue-100 text-blue-700" :
+                                                        "bg-yellow-100 text-yellow-700"
+                                                }`}>
+                                                {leave.status}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-gray-600 flex justify-between items-center border-t border-gray-200 pt-2">
+                                            <span className="font-medium text-gray-500">Session</span>
+                                            <span className="font-medium text-gray-900">{leave.session || "-"}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Desktop View - Table */}
+                            <div className="hidden md:block overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+                                <table className="w-full text-left border-collapse min-w-[300px]">
+                                    <thead className="bg-gray-50 border-b border-gray-100">
+                                        <tr>
+                                            <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Type</th>
+                                            <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Dates</th>
+                                            <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Duration</th>
+                                            <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Session</th>
+                                            <th className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase">Status</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {leaves.slice(0, 5).map((leave) => (
+                                            <tr key={leave.id}>
+                                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{leave.type}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">
+                                                    {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">
+                                                    {leave.leaveValue} Day(s)
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">
+                                                    {leave.session || "-"}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] md:text-xs font-medium ${leave.status === "Approved" ? "bg-green-100 text-green-700" :
+                                                        leave.status === "Rejected" ? "bg-red-100 text-red-700" :
+                                                            leave.status === "Recommended" ? "bg-blue-100 text-blue-700" :
+                                                                "bg-yellow-100 text-yellow-700"
+                                                        }`}>
+                                                        {leave.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>
