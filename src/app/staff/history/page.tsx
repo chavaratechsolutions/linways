@@ -89,7 +89,7 @@ export default function StaffHistoryPage() {
                 )}
 
                 {/* Mobile View: Cards */}
-                <div className="grid grid-cols-1 gap-4 md:hidden">
+                <div className="grid grid-cols-1 gap-4 lg:hidden">
                     {loading ? (
                         <div className="text-center py-12 text-gray-400">Loading history...</div>
                     ) : leaves.length === 0 ? (
@@ -135,7 +135,7 @@ export default function StaffHistoryPage() {
                 </div>
 
                 {/* Desktop View: Table */}
-                <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-gray-50 border-b border-gray-100">

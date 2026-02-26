@@ -9,6 +9,7 @@ import { Check, X, AlertCircle, CalendarClock, Search } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Timestamp } from "firebase/firestore";
 import { LEAVE_LIMITS, LeaveType } from "@/lib/constants";
+import DateRangePicker from "@/components/DateRangePicker";
 
 interface LeaveRequest {
     id: string;
@@ -36,6 +37,9 @@ function AdminRequestManagerContent() {
     const statusParam = searchParams.get("status") || "Pending";
     const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected" | "Recommended">(statusParam as any);
     const [searchTerm, setSearchTerm] = useState("");
+    const [filterDepartment, setFilterDepartment] = useState("All");
+    const [filterFromDate, setFilterFromDate] = useState("");
+    const [filterToDate, setFilterToDate] = useState("");
 
     useEffect(() => {
         if (["All", "Pending", "Approved", "Rejected", "Recommended"].includes(statusParam)) {
@@ -92,9 +96,9 @@ function AdminRequestManagerContent() {
             })) as LeaveRequest[];
 
             leavesData.sort((a, b) => {
-                const timeA = a.createdAt?.seconds || 0;
-                const timeB = b.createdAt?.seconds || 0;
-                return timeB - timeA;
+                const dateA = new Date(a.fromDate).getTime();
+                const dateB = new Date(b.fromDate).getTime();
+                return dateB - dateA;
             });
 
             setLeaves(leavesData);
@@ -134,13 +138,36 @@ function AdminRequestManagerContent() {
             ((staff?.displayName || "").toLowerCase().includes(searchLower) ||
                 (l.userEmail || "").toLowerCase().includes(searchLower));
 
-        if (!matchesSearch) return false;
+        const matchesDepartment = filterDepartment === "All" || staff?.department === filterDepartment;
+
+        let matchesDate = true;
+        if (filterFromDate || filterToDate) {
+            const leaveStartDate = l.fromDate;
+            const leaveEndDate = l.toDate;
+
+            if (filterFromDate && filterToDate) {
+                // If both are set, the leave must overlap with the selected range
+                matchesDate = leaveEndDate >= filterFromDate && leaveStartDate <= filterToDate;
+            } else if (filterFromDate) {
+                // Only From Date is set: leave end date must be on or after this date
+                matchesDate = leaveEndDate >= filterFromDate;
+            } else if (filterToDate) {
+                // Only To Date is set: leave start date must be on or before this date
+                matchesDate = leaveStartDate <= filterToDate;
+            }
+        }
+
+        if (!matchesSearch || !matchesDepartment || !matchesDate) return false;
 
         if (filter === "All") return true;
         // The "Pending" filter tab should now show "Recommended" items (actionable items for Principal)
         if (filter === "Pending") return l.status === "Recommended";
         return l.status === filter;
     });
+
+    const uniqueDepartments = Array.from(
+        new Set(Object.values(staffMap).map((staff: any) => staff?.department).filter(dep => dep && dep !== "-"))
+    ).sort();
 
     return (
         <DashboardLayout allowedRole="princi">
@@ -151,17 +178,41 @@ function AdminRequestManagerContent() {
                         <p className="text-sm text-gray-500 text-pretty">Review and respond to leave applications below.</p>
                     </div>
 
-                    <div className="relative w-full md:w-72">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="h-5 w-5 text-gray-400" />
+                    <div className="flex flex-col gap-3">
+                        <div className="relative w-full md:w-96">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search requests..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow shadow-sm"
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Search requests..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow shadow-sm"
-                        />
+                        <div className="flex flex-row gap-2 w-full">
+                            <div className="w-1/2 sm:w-auto">
+                                <DateRangePicker
+                                    startDate={filterFromDate}
+                                    endDate={filterToDate}
+                                    onDateChange={(start, end) => {
+                                        setFilterFromDate(start);
+                                        setFilterToDate(end);
+                                    }}
+                                />
+                            </div>
+                            <select
+                                value={filterDepartment}
+                                onChange={(e) => setFilterDepartment(e.target.value)}
+                                className="bg-white border border-gray-300 text-gray-900 text-xs md:text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block w-1/2 sm:w-48 p-2 md:p-2.5 transition-shadow shadow-sm cursor-pointer"
+                            >
+                                <option value="All">All Departments</option>
+                                {uniqueDepartments.map(dep => (
+                                    <option key={dep as string} value={dep as string}>{dep as string}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -172,7 +223,7 @@ function AdminRequestManagerContent() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-4 lg:hidden">
+                <div className="grid grid-cols-1 gap-4 xl:hidden">
                     {loading ? (
                         <div className="text-center py-12 text-gray-400">Loading requests...</div>
                     ) : filteredLeaves.length === 0 ? (
@@ -209,7 +260,7 @@ function AdminRequestManagerContent() {
                                         </span>
                                     </div>
                                     <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">
-                                        <p className="font-semibold text-xs uppercase text-blue-600 mb-1">{leave.type} ({leave.leaveValue} Days)</p>
+                                        <p className="font-semibold text-xs uppercase text-blue-600 mb-1">{leave.type} ({leave.leaveValue} Days) - {leave.session}</p>
                                         <p className="font-medium break-words">{leave.reason}</p>
                                         <p className="text-xs mt-1 italic break-words">{leave.description}</p>
                                     </div>
@@ -238,7 +289,7 @@ function AdminRequestManagerContent() {
                     )}
                 </div>
 
-                <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="hidden xl:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-gray-50 border-b border-gray-100">

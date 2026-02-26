@@ -80,11 +80,11 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     role === "hod" ? "/hod/requests" : "/admin/requests",
             icon: Calendar,
             subItems: [
+                { name: "All", href: role === "princi" ? "/principal/requests?status=All" : role === "dir" ? "/director/requests?status=All" : role === "hod" ? "/hod/requests?status=All" : "/admin/requests?status=All" },
                 { name: "Pending", href: role === "princi" ? "/principal/requests?status=Pending" : role === "dir" ? "/director/requests?status=Pending" : role === "hod" ? "/hod/requests?status=Pending" : "/admin/requests?status=Pending" },
                 { name: "Recommended", href: role === "princi" ? "/principal/requests?status=Recommended" : role === "dir" ? "/director/requests?status=Recommended" : role === "hod" ? "/hod/requests?status=Recommended" : "/admin/requests?status=Recommended" },
                 { name: "Approved", href: role === "princi" ? "/principal/requests?status=Approved" : role === "dir" ? "/director/requests?status=Approved" : role === "hod" ? "/hod/requests?status=Approved" : "/admin/requests?status=Approved" },
                 { name: "Rejected", href: role === "princi" ? "/principal/requests?status=Rejected" : role === "dir" ? "/director/requests?status=Rejected" : role === "hod" ? "/hod/requests?status=Rejected" : "/admin/requests?status=Rejected" },
-                { name: "All", href: role === "princi" ? "/principal/requests?status=All" : role === "dir" ? "/director/requests?status=All" : role === "hod" ? "/hod/requests?status=All" : "/admin/requests?status=All" },
             ]
         },
         {
@@ -134,7 +134,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             {/* Mobile Overlay */}
             <div
                 className={cn(
-                    "fixed inset-0 z-40 bg-gray-900/50 backdrop-blur-sm lg:hidden transition-opacity duration-300",
+                    "fixed inset-0 z-40 bg-gray-900/50 backdrop-blur-sm [@media(min-aspect-ratio:3/2)]:hidden transition-opacity duration-300",
                     isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
                 )}
                 onClick={() => setIsOpen(false)}
@@ -142,7 +142,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
             {/* Sidebar */}
             <div className={cn(
-                "fixed inset-y-0 left-0 z-50 w-64 flex-col bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0",
+                "fixed inset-y-0 left-0 z-50 w-64 flex-col bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out [@media(min-aspect-ratio:3/2)]:static [@media(min-aspect-ratio:3/2)]:translate-x-0",
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6">
@@ -150,7 +150,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                         <span className="text-lg font-bold text-blue-600 tracking-tight hover:text-blue-700 transition-colors">HR Management System</span>
                     </Link>
                     <button
-                        className="lg:hidden p-1 rounded-md text-gray-500 hover:bg-gray-100"
+                        className="[@media(min-aspect-ratio:3/2)]:hidden p-1 rounded-md text-gray-500 hover:bg-gray-100"
                         onClick={() => setIsOpen(false)}
                     >
                         <X className="h-6 w-6" />

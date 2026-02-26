@@ -9,6 +9,7 @@ import { Check, X, AlertCircle, CalendarClock, Search } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Timestamp } from "firebase/firestore";
 import { LEAVE_LIMITS, LeaveType } from "@/lib/constants";
+import DateRangePicker from "@/components/DateRangePicker";
 
 interface LeaveRequest {
     id: string;
@@ -36,6 +37,9 @@ function AdminRequestManagerContent() {
     const statusParam = searchParams.get("status") || "Pending";
     const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected" | "Recommended">(statusParam as any);
     const [searchTerm, setSearchTerm] = useState("");
+    const [filterDepartment, setFilterDepartment] = useState("All");
+    const [filterFromDate, setFilterFromDate] = useState("");
+    const [filterToDate, setFilterToDate] = useState("");
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
     useEffect(() => {
@@ -84,7 +88,7 @@ function AdminRequestManagerContent() {
 
     useEffect(() => {
         if (!db) return;
-        const q = query(collection(db, "leaves"), where("type", "==", "Compensatory Leave"));
+        const q = query(collection(db, "leaves"));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const leavesData = snapshot.docs.map(doc => ({
@@ -93,9 +97,9 @@ function AdminRequestManagerContent() {
             })) as LeaveRequest[];
 
             leavesData.sort((a, b) => {
-                const timeA = a.createdAt?.seconds || 0;
-                const timeB = b.createdAt?.seconds || 0;
-                return timeB - timeA;
+                const dateA = new Date(a.fromDate).getTime();
+                const dateB = new Date(b.fromDate).getTime();
+                return dateB - dateA;
             });
 
             setLeaves(leavesData);
@@ -130,12 +134,14 @@ function AdminRequestManagerContent() {
     const filteredLeaves = leaves.filter(l => {
         // Compensatory Leave Workflow: Staff -> HOD -> Director -> Principal
         if (l.type === "Compensatory Leave") {
-            // Director sees it only if it is "Recommended" AND currently recommended by "HOD"
-            // If it is already recommended by Director or others, status might still be "Recommended" but we need to check flow.
-            // Wait, if Director recommends it, status is still "Recommended" but recommendedBy becomes "Director".
-            // So Director should see it if recommendedBy is "HOD".
             if (filter === "Pending") {
-                return l.status === "Recommended" && l.recommendedBy === "HOD";
+                if (!(l.status === "Recommended" && l.recommendedBy === "HOD")) {
+                    return false;
+                }
+            }
+        } else {
+            if (filter !== "All" && filter !== "Approved" && filter !== "Rejected") {
+                return false;
             }
         }
 
@@ -145,7 +151,26 @@ function AdminRequestManagerContent() {
             ((staff?.displayName || "").toLowerCase().includes(searchLower) ||
                 (l.userEmail || "").toLowerCase().includes(searchLower));
 
-        if (!matchesSearch) return false;
+        const matchesDepartment = filterDepartment === "All" || staff?.department === filterDepartment;
+
+        let matchesDate = true;
+        if (filterFromDate || filterToDate) {
+            const leaveStartDate = l.fromDate;
+            const leaveEndDate = l.toDate;
+
+            if (filterFromDate && filterToDate) {
+                // If both are set, the leave must overlap with the selected range
+                matchesDate = leaveEndDate >= filterFromDate && leaveStartDate <= filterToDate;
+            } else if (filterFromDate) {
+                // Only From Date is set: leave end date must be on or after this date
+                matchesDate = leaveEndDate >= filterFromDate;
+            } else if (filterToDate) {
+                // Only To Date is set: leave start date must be on or before this date
+                matchesDate = leaveStartDate <= filterToDate;
+            }
+        }
+
+        if (!matchesSearch || !matchesDepartment || !matchesDate) return false;
 
         if (filter === "All") return true;
 
@@ -160,6 +185,10 @@ function AdminRequestManagerContent() {
 
         return l.status === filter;
     });
+
+    const uniqueDepartments = Array.from(
+        new Set(Object.values(staffMap).map((staff: any) => staff?.department).filter(dep => dep && dep !== "-"))
+    ).sort();
 
     return (
         <DashboardLayout allowedRole="dir">
@@ -184,191 +213,214 @@ function AdminRequestManagerContent() {
                         ))}
                     </div>
 
-                    <div className="relative w-full md:w-72">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="h-5 w-5 text-gray-400" />
+                    <div className="flex flex-col gap-3">
+                        <div className="relative w-full md:w-96">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search requests..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow shadow-sm"
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Search requests..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow shadow-sm"
-                        />
-                    </div>
-                </div>
-
-                {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-3">
-                        <AlertCircle className="h-5 w-5 shrink-0" />
-                        <p className="text-sm">Error loading data: {error}</p>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 lg:hidden">
-                    {loading ? (
-                        <div className="text-center py-12 text-gray-400">Loading requests...</div>
-                    ) : filteredLeaves.length === 0 ? (
-                        <div className="text-center py-12 text-gray-400 italic bg-white rounded-xl border border-gray-100">
-                            No {filter.toLowerCase()} requests found.
+                        <div className="flex flex-row gap-2 w-full">
+                            <div className="w-1/2 sm:w-auto">
+                                <DateRangePicker
+                                    startDate={filterFromDate}
+                                    endDate={filterToDate}
+                                    onDateChange={(start, end) => {
+                                        setFilterFromDate(start);
+                                        setFilterToDate(end);
+                                    }}
+                                />
+                            </div>
+                            <select
+                                value={filterDepartment}
+                                onChange={(e) => setFilterDepartment(e.target.value)}
+                                className="bg-white border border-gray-300 text-gray-900 text-xs md:text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block w-1/2 sm:w-48 p-2 md:p-2.5 transition-shadow shadow-sm cursor-pointer"
+                            >
+                                <option value="All">All Departments</option>
+                                {uniqueDepartments.map(dep => (
+                                    <option key={dep as string} value={dep as string}>{dep as string}</option>
+                                ))}
+                            </select>
                         </div>
-                    ) : (
-                        filteredLeaves.map((leave) => {
-                            const staff = staffMap[leave.userId];
-                            const leavesUsed = leaveUsageMap[leave.userId] || 0;
-                            return (
-                                <div key={leave.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-semibold text-gray-900 truncate max-w-[200px]">
-                                                {staff ? `${staff.salutation || ""} ${staff.displayName}` : leave.userEmail}
-                                            </h3>
-                                            <p className="text-xs text-gray-500">
-                                                {staff ? <>{staff.designation || "-"}<br />{staff.department || "-"}</> : "External"}
-                                            </p>
-                                            <div className="flex items-center gap-1 mt-1 text-xs text-blue-600 font-medium">
-                                                <CalendarClock className="h-3 w-3" />
-                                                <span>
-                                                    Balance: {Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0))} / {LEAVE_LIMITS[leave.type as LeaveType] || "-"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${leave.status === "Approved" ? "bg-green-100 text-green-700 border-green-200" :
-                                            leave.status === "Rejected" ? "bg-red-100 text-red-700 border-red-200" :
-                                                leave.status === "Recommended" ? "bg-blue-100 text-blue-700 border-blue-200" :
-                                                    "bg-yellow-100 text-yellow-700 border-yellow-200"
-                                            }`}>
-                                            {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
-                                        </span>
-                                    </div>
-                                    <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">
-                                        <p className="font-semibold text-xs uppercase text-blue-600 mb-1">{leave.type} ({leave.leaveValue} Days)</p>
-                                        <p className="font-medium break-words">{leave.reason}</p>
-                                        <p className="text-xs mt-1 italic break-words">{leave.description}</p>
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                        {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
-                                    </div>
-                                    {(leave.status === "Pending" || (leave.status === "Recommended" && leave.recommendedBy === "HOD")) && (
-                                        <div className="flex gap-2 pt-2 border-t border-gray-100">
-                                            <button
-                                                onClick={() => handleAction(leave.id, "Recommended")}
-                                                className="flex-1 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
-                                            >
-                                                Recommend
-                                            </button>
-                                            <button
-                                                onClick={() => handleAction(leave.id, "Rejected")}
-                                                className="flex-1 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
-                                            >
-                                                Reject
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-
-                <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-gray-50 border-b border-gray-100">
-                                <tr>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Staff Details</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-center">Remaining Balance</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Type & Duration</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Reason & Details</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Dates</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Status</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {loading ? (
-                                    <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading requests...</td></tr>
-                                ) : filteredLeaves.length === 0 ? (
-                                    <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 py-16">No {filter.toLowerCase()} requests found.</td></tr>
-                                ) : (
-                                    filteredLeaves.map((leave) => {
-                                        const staff = staffMap[leave.userId];
-                                        const leavesUsed = leaveUsageMap[leave.userId] || 0;
-                                        return (
-                                            <tr key={leave.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div>
-                                                        <span className="text-sm font-bold text-gray-900 block">
-                                                            {staff ? `${staff.salutation || ""} ${staff.displayName}` : leave.userEmail}
-                                                        </span>
-                                                        <span className="text-xs text-gray-500 block mt-0.5">
-                                                            {staff ? <>{staff.designation || "-"}<br />{staff.department || "-"}</> : "External User"}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0)) === 0
-                                                        ? 'bg-red-100 text-red-700'
-                                                        : 'bg-blue-50 text-blue-700'
-                                                        }`}>
-                                                        {Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0))} left
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="text-sm font-medium text-gray-900">{leave.type}</div>
-                                                    <div className="text-xs text-blue-600 font-semibold uppercase">{leave.leaveValue} Day(s) - {leave.session}</div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="min-w-[200px] max-w-sm">
-                                                        <p className="text-sm text-gray-900 font-medium break-words" title={leave.reason}>{leave.reason}</p>
-                                                        <p className="text-xs text-gray-500 mt-0.5 break-words" title={leave.description}>{leave.description}</p>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">
-                                                    {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")}
-                                                    {leave.toDate && leave.toDate !== leave.fromDate && ` - ${format(new Date(leave.toDate), "MMM dd")}`}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${leave.status === "Approved" ? "bg-green-100 text-green-700 border-green-200" :
-                                                        leave.status === "Rejected" ? "bg-red-100 text-red-700 border-red-200" :
-                                                            leave.status === "Recommended" ? "bg-blue-100 text-blue-700 border-blue-200" :
-                                                                "bg-yellow-100 text-yellow-700 border-yellow-200"
-                                                        }`}>
-                                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex justify-end gap-2">
-                                                        {(leave.status === "Pending" || (leave.status === "Recommended" && leave.recommendedBy === "HOD")) ? (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => handleAction(leave.id, "Recommended")}
-                                                                    className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
-                                                                >
-                                                                    Recommend
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleAction(leave.id, "Rejected")}
-                                                                    className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
-                                                                >
-                                                                    Reject
-                                                                </button>
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-xs text-gray-400 italic">Actioned</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>
 
+            {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-3">
+                    <AlertCircle className="h-5 w-5 shrink-0" />
+                    <p className="text-sm">Error loading data: {error}</p>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 xl:hidden">
+                {loading ? (
+                    <div className="text-center py-12 text-gray-400">Loading requests...</div>
+                ) : filteredLeaves.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 italic bg-white rounded-xl border border-gray-100">
+                        No {filter.toLowerCase()} requests found.
+                    </div>
+                ) : (
+                    filteredLeaves.map((leave) => {
+                        const staff = staffMap[leave.userId];
+                        const leavesUsed = leaveUsageMap[leave.userId] || 0;
+                        return (
+                            <div key={leave.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900 truncate max-w-[200px]">
+                                            {staff ? `${staff.salutation || ""} ${staff.displayName}` : leave.userEmail}
+                                        </h3>
+                                        <p className="text-xs text-gray-500">
+                                            {staff ? <>{staff.designation || "-"}<br />{staff.department || "-"}</> : "External"}
+                                        </p>
+                                        <div className="flex items-center gap-1 mt-1 text-xs text-blue-600 font-medium">
+                                            <CalendarClock className="h-3 w-3" />
+                                            <span>
+                                                Balance: {Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0))} / {LEAVE_LIMITS[leave.type as LeaveType] || "-"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${leave.status === "Approved" ? "bg-green-100 text-green-700 border-green-200" :
+                                        leave.status === "Rejected" ? "bg-red-100 text-red-700 border-red-200" :
+                                            leave.status === "Recommended" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                                                "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                        }`}>
+                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
+                                    </span>
+                                </div>
+                                <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">
+                                    <p className="font-semibold text-xs uppercase text-blue-600 mb-1">{leave.type} ({leave.leaveValue} Days) - {leave.session}</p>
+                                    <p className="font-medium break-words">{leave.reason}</p>
+                                    <p className="text-xs mt-1 italic break-words">{leave.description}</p>
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                    {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
+                                </div>
+                                {(leave.status === "Pending" || (leave.status === "Recommended" && leave.recommendedBy === "HOD")) && (filter !== "All" || leave.type === "Compensatory Leave") && (
+                                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                                        <button
+                                            onClick={() => handleAction(leave.id, "Recommended")}
+                                            className="flex-1 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                        >
+                                            Recommend
+                                        </button>
+                                        <button
+                                            onClick={() => handleAction(leave.id, "Rejected")}
+                                            className="flex-1 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                        >
+                                            Reject
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+
+            <div className="hidden xl:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Staff Details</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-center">Remaining Balance</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Type & Duration</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Reason & Details</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Dates</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Status</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {loading ? (
+                                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading requests...</td></tr>
+                            ) : filteredLeaves.length === 0 ? (
+                                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 py-16">No {filter.toLowerCase()} requests found.</td></tr>
+                            ) : (
+                                filteredLeaves.map((leave) => {
+                                    const staff = staffMap[leave.userId];
+                                    const leavesUsed = leaveUsageMap[leave.userId] || 0;
+                                    return (
+                                        <tr key={leave.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div>
+                                                    <span className="text-sm font-bold text-gray-900 block">
+                                                        {staff ? `${staff.salutation || ""} ${staff.displayName}` : leave.userEmail}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500 block mt-0.5">
+                                                        {staff ? <>{staff.designation || "-"}<br />{staff.department || "-"}</> : "External User"}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0)) === 0
+                                                    ? 'bg-red-100 text-red-700'
+                                                    : 'bg-blue-50 text-blue-700'
+                                                    }`}>
+                                                    {Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0))} left
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm font-medium text-gray-900">{leave.type}</div>
+                                                <div className="text-xs text-blue-600 font-semibold uppercase">{leave.leaveValue} Day(s) - {leave.session}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="min-w-[200px] max-w-sm">
+                                                    <p className="text-sm text-gray-900 font-medium break-words" title={leave.reason}>{leave.reason}</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5 break-words" title={leave.description}>{leave.description}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">
+                                                {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")}
+                                                {leave.toDate && leave.toDate !== leave.fromDate && ` - ${format(new Date(leave.toDate), "MMM dd")}`}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${leave.status === "Approved" ? "bg-green-100 text-green-700 border-green-200" :
+                                                    leave.status === "Rejected" ? "bg-red-100 text-red-700 border-red-200" :
+                                                        leave.status === "Recommended" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                                                            "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                                    }`}>
+                                                    {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex justify-end gap-2">
+                                                    {(leave.status === "Pending" || (leave.status === "Recommended" && leave.recommendedBy === "HOD")) && (filter !== "All" || leave.type === "Compensatory Leave") ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleAction(leave.id, "Recommended")}
+                                                                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                                            >
+                                                                Recommend
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleAction(leave.id, "Rejected")}
+                                                                className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                            >
+                                                                Reject
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400 italic">Actioned</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             {showSuccessPopup && (
                 <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4">
                     <div className="bg-white border border-blue-100 shadow-lg rounded-xl p-4 flex items-center gap-3">
