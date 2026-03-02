@@ -99,7 +99,7 @@ export default function DateRangePicker({ startDate, endDate, onDateChange, plac
         for (let i = 0; i < 7; i++) {
             days.push(
                 <div key={i} className="text-center font-medium text-xs text-gray-500 py-1">
-                    {format(addMonths(startDate, i), dateFormat)}
+                    {format(addDays(startDate, i), dateFormat)}
                 </div>
             );
         }
