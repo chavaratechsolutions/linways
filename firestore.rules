@@ -66,5 +66,22 @@ service cloud.firestore {
       // Admins can delete if needed, staff cannot
       allow delete: if isAdmin();
     }
+
+    // Rules for the 'compLeaveGrants' collection
+    match /compLeaveGrants/{grantId} {
+      // Staff can read their own grants; HODs and admins can read all
+      allow read: if isAuthenticated() && (
+        resource.data.staffId == request.auth.uid || isAdmin()
+      );
+
+      // Only HODs and admins can create comp leave grant records
+      allow create: if isAuthenticated() && (
+        getUserData().role == 'hod' ||
+        getUserData().role == 'admin'
+      );
+
+      // No one can update or delete a grant once created (immutable audit trail)
+      allow update, delete: if getUserData().role == 'admin';
+    }
   }
 }

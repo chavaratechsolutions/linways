@@ -113,6 +113,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
     if (role === "hod") {
         adminLinks.push(
+            { name: "Manage Comp Leave", href: "/hod/comp-leave", icon: FileUp },
             { name: "Request Leave", href: "/hod/request", icon: FilePlus },
             { name: "My History", href: "/hod/history", icon: ClipboardList }
         );

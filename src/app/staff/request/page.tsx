@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
@@ -20,6 +20,84 @@ export default function LeaveRequestPage() {
         reason: "",
         description: "",
     });
+    const [compLeaveBalance, setCompLeaveBalance] = useState<{
+        granted: number;
+        used: number;
+        nearestExpiryMs: number | null;
+        grantsList: { id: string; days: number; expiresAt: number; available: number }[];
+    } | null>(null);
+    const isCompLeave = formData.type === "Compensatory Leave";
+
+    // Fetch compensatory leave balance when type changes
+    useEffect(() => {
+        if (!user || !isCompLeave) { setCompLeaveBalance(null); return; }
+
+        const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000; // 90 days in ms
+        const now = Date.now();
+
+        const fetchBalance = async () => {
+            try {
+                // Fetch all approved grants
+                const grantsQ = query(
+                    collection(db, "compLeaveGrants"),
+                    where("staffId", "==", user.uid),
+                    where("status", "==", "Approved")
+                );
+                const grantsSnap = await getDocs(grantsQ);
+
+                // Only count grants still within 90-day validity window
+                const validGrants = grantsSnap.docs.filter(d => {
+                    const createdSec = d.data().createdAt?.seconds ?? 0;
+                    return (createdSec * 1000 + COMP_VALIDITY_MS) >= now;
+                });
+
+                const totalGranted = validGrants.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
+
+                // Find the earliest valid grant timestamp — only count comp leave USED after that point
+                const minGrantSeconds = validGrants.length > 0
+                    ? Math.min(...validGrants.map(d => d.data().createdAt?.seconds ?? Infinity))
+                    : Infinity;
+
+                // Count comp leaves used after the first valid grant was issued
+                const usedQ = query(
+                    collection(db, "leaves"),
+                    where("userId", "==", user.uid),
+                    where("type", "==", "Compensatory Leave"),
+                    where("status", "==", "Approved")
+                );
+                const usedSnap = await getDocs(usedQ);
+                const totalUsed = usedSnap.docs
+                    .filter(d => (d.data().createdAt?.seconds ?? 0) >= minGrantSeconds)
+                    .reduce((sum, d) => sum + (d.data().leaveValue || 0), 0);
+
+                // Build detailed list of individual grants for the UI
+                let remainingUsed = totalUsed;
+                const sortedValidGrants = validGrants
+                    .map(d => {
+                        const days = d.data().grantedDays || 0;
+                        const createdSec = d.data().createdAt?.seconds ?? 0;
+                        const expiresAt = createdSec * 1000 + COMP_VALIDITY_MS;
+                        return { id: d.id, days, expiresAt };
+                    })
+                    .sort((a, b) => a.expiresAt - b.expiresAt); // Oldest expiry first
+
+                const grantsList = sortedValidGrants.map(g => {
+                    // Deduct used leaves proportionally from older grants first
+                    const deduct = Math.min(g.days, remainingUsed);
+                    remainingUsed -= deduct;
+                    return { ...g, available: g.days - deduct };
+                }).filter(g => g.available > 0); // Only keep grants that still have available days
+
+                const nearestExpiryMs = grantsList.length > 0 ? grantsList[0].expiresAt : null;
+
+                setCompLeaveBalance({ granted: totalGranted, used: totalUsed, nearestExpiryMs, grantsList });
+            } catch (err) {
+                console.error("Failed to fetch comp leave balance:", err);
+            }
+        };
+
+        fetchBalance();
+    }, [user, isCompLeave]);
 
     // Helper to check if a date is today
     const isToday = (dateString: string) => {
@@ -133,6 +211,22 @@ export default function LeaveRequestPage() {
 
         setLoading(true);
 
+        // Compensatory Leave balance validation
+        if (isCompLeave && compLeaveBalance !== null) {
+            const available = compLeaveBalance.granted - compLeaveBalance.used;
+            const requested = calculateLeaveValue();
+            if (available <= 0) {
+                alert("You have no Compensatory Leave balance. Please contact your HOD.");
+                setLoading(false);
+                return;
+            }
+            if (requested > available) {
+                alert(`You can only apply for ${available} day(s) of Compensatory Leave. You have requested ${requested} day(s).`);
+                setLoading(false);
+                return;
+            }
+        }
+
         // Validation
         if (formData.fromDate && formData.toDate) {
             const start = parseISO(formData.fromDate);
@@ -228,6 +322,52 @@ export default function LeaveRequestPage() {
                                 <option>Maternity Leave</option>
                                 <option>Compensatory Leave</option>
                             </select>
+                            {isCompLeave && compLeaveBalance !== null && (() => {
+                                const available = Math.max(0, compLeaveBalance.granted - compLeaveBalance.used);
+                                const allExpired = available === 0;
+
+                                return (
+                                    <div className={`mt-2 px-3 py-2.5 rounded-lg text-xs font-medium border space-y-2 ${allExpired
+                                        ? "bg-red-50 border-red-200 text-red-700"
+                                        : "bg-indigo-50 border-indigo-200 text-indigo-700"
+                                        }`}>
+                                        <div className="flex flex-wrap justify-between items-center gap-1">
+                                            <span>{allExpired ? "No comp leave available" : "Comp Leave Balance"}</span>
+                                            {!allExpired && (
+                                                <span className="font-bold">
+                                                    {available} day(s) available
+                                                    <span className="font-normal ml-1 opacity-70">
+                                                        ({compLeaveBalance.used} used / {compLeaveBalance.granted} granted)
+                                                    </span>
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {!allExpired && compLeaveBalance.grantsList.length > 0 && (
+                                            <div className="flex flex-col gap-1 mt-2 border-t border-indigo-200/50 pt-2">
+                                                <span className="opacity-70 text-[10px] uppercase tracking-wider">Available Grants:</span>
+                                                {compLeaveBalance.grantsList.map(g => {
+                                                    const daysUntilExpiry = Math.ceil((g.expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
+                                                    const isExpiringSoon = daysUntilExpiry <= 30;
+                                                    const dateStr = new Date(g.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+                                                    return (
+                                                        <div key={g.id} className="flex justify-between items-center bg-white/40 px-2 py-1 rounded">
+                                                            <span className="font-semibold">{g.available} day(s)</span>
+                                                            <span className={isExpiringSoon ? "text-yellow-700 font-bold" : "opacity-80"}>
+                                                                {isExpiringSoon ? `⚠ Expires in ${daysUntilExpiry}d (${dateStr})` : `Valid until ${dateStr}`}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                            {isCompLeave && compLeaveBalance === null && (
+                                <p className="mt-1.5 text-xs text-gray-400 italic">Loading your comp leave balance…</p>
+                            )}
                         </div>
 
                         <div>

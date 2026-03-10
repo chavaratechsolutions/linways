@@ -21,6 +21,7 @@ export default function LoginPage() {
             if (role === "admin") router.push("/admin");
             else if (role === "dir") router.push("/director");
             else if (role === "princi") router.push("/principal");
+            else if (role === "hod") router.push("/hod");
             else router.push("/staff");
         }
     }, [user, role, authLoading, router]);
@@ -42,6 +43,7 @@ export default function LoginPage() {
                 if (userRole === "admin") router.push("/admin");
                 else if (userRole === "dir") router.push("/director");
                 else if (userRole === "princi") router.push("/principal");
+                else if (userRole === "hod") router.push("/hod");
                 else router.push("/staff");
             } else {
                 setError("User record not found in database.");

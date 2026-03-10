@@ -6,7 +6,7 @@ import { ClipboardList, Clock, CheckCircle, XCircle, AlertCircle, X } from "luci
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
 import Link from "next/link";
@@ -43,6 +43,7 @@ function StaffDashboardContent() {
         approved: 0,
         rejected: 0,
     });
+    const [compLeaveInfo, setCompLeaveInfo] = useState<{ granted: number; minGrantSeconds: number }>({ granted: 0, minGrantSeconds: Infinity });
     const searchParams = useSearchParams();
     const router = useRouter();
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
@@ -108,6 +109,38 @@ function StaffDashboardContent() {
         return () => unsubscribe();
     }, [user]);
 
+    // Fetch HOD-granted comp leave balance
+    useEffect(() => {
+        if (!user || !db) return;
+
+        const fetchCompLeave = async () => {
+            try {
+                const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000;
+                const now = Date.now();
+                const q = query(
+                    collection(db, "compLeaveGrants"),
+                    where("staffId", "==", user.uid),
+                    where("status", "==", "Approved")
+                );
+                const snap = await getDocs(q);
+                // Only use grants still within 90-day validity window
+                const validDocs = snap.docs.filter(d => {
+                    const sec = d.data().createdAt?.seconds ?? 0;
+                    return (sec * 1000 + COMP_VALIDITY_MS) >= now;
+                });
+                const total = validDocs.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
+                const minGrantSeconds = validDocs.length > 0
+                    ? Math.min(...validDocs.map(d => d.data().createdAt?.seconds ?? Infinity))
+                    : Infinity;
+                setCompLeaveInfo({ granted: total, minGrantSeconds });
+            } catch (err) {
+                console.error("Failed to fetch comp leave grants:", err);
+            }
+        };
+
+        fetchCompLeave();
+    }, [user]);
+
     const statCards = [
         { name: "Total Requests", value: loading ? "..." : stats.total, icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-100", href: "/staff/history" },
         { name: "Pending", value: loading ? "..." : stats.pending, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-100", href: "/staff/history" },
@@ -171,22 +204,29 @@ function StaffDashboardContent() {
                             // Calculate used leaves for this type in current year
                             const currentYear = new Date().getFullYear();
                             const used = leaves
-                                .filter(l =>
-                                    l.type === type &&
-                                    l.status === 'Approved' &&
-                                    (l.fromDate ? new Date(l.fromDate).getFullYear() === currentYear : true)
-                                )
+                                .filter(l => {
+                                    if (l.type !== type || l.status !== 'Approved') return false;
+                                    if (l.fromDate && new Date(l.fromDate).getFullYear() !== currentYear) return false;
+                                    // For Comp Leave: only count leaves applied AFTER the first HOD grant
+                                    if (type === "Compensatory Leave") {
+                                        const createdSec = (l.createdAt as any)?.seconds ?? 0;
+                                        return createdSec >= compLeaveInfo.minGrantSeconds;
+                                    }
+                                    return true;
+                                })
                                 .reduce((acc, curr) => acc + (curr.leaveValue || 0), 0);
 
-                            const percentage = Math.min((used / limit) * 100, 100);
-                            const isNearLimit = percentage >= 80;
+                            // For Compensatory Leave, use the dynamically granted limit
+                            const effectiveLimit = type === "Compensatory Leave" ? compLeaveInfo.granted : limit;
+                            const percentage = effectiveLimit > 0 ? Math.min((used / effectiveLimit) * 100, 100) : 0;
+                            const isNearLimit = effectiveLimit > 0 && percentage >= 80;
 
                             return (
                                 <div key={type} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-sm font-medium text-gray-700 truncate" title={type}>{type}</span>
                                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isNearLimit ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                            {used}/{limit}
+                                            {used}/{effectiveLimit}
                                         </span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -195,6 +235,9 @@ function StaffDashboardContent() {
                                             style={{ width: `${percentage}%` }}
                                         ></div>
                                     </div>
+                                    {type === "Compensatory Leave" && effectiveLimit === 0 && (
+                                        <p className="text-[10px] text-gray-400 italic mt-1">No grants yet</p>
+                                    )}
                                 </div>
                             );
                         })}

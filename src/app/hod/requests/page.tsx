@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
-import { collection, query, onSnapshot, doc, updateDoc, where } from "firebase/firestore";
+import { collection, query, onSnapshot, doc, updateDoc, where, getDocs } from "firebase/firestore";
 import { format, startOfYear, endOfYear } from "date-fns";
 import { Check, X, AlertCircle, CalendarClock } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -32,6 +32,7 @@ function AdminRequestManagerContent() {
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
     const [staffMap, setStaffMap] = useState<Record<string, any>>({});
     const [leaveUsageMap, setLeaveUsageMap] = useState<Record<string, Record<string, number>>>({});
+    const [compGrantsMap, setCompGrantsMap] = useState<Record<string, number>>({}); // staffId -> total granted comp leave days
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const searchParams = useSearchParams();
@@ -84,6 +85,38 @@ function AdminRequestManagerContent() {
 
         return () => unsubscribe();
     }, []);
+
+    // Fetch Comp Leave Grants per staff
+    useEffect(() => {
+        if (!db || !userData?.department) return;
+
+        const fetchCompGrants = async () => {
+            try {
+                const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000;
+                const now = Date.now();
+                const q = query(
+                    collection(db, "compLeaveGrants"),
+                    where("department", "==", userData.department),
+                    where("status", "==", "Approved")
+                );
+                const snap = await getDocs(q);
+                const map: Record<string, number> = {};
+                snap.docs.forEach(d => {
+                    const { staffId, grantedDays, createdAt } = d.data();
+                    const sec = createdAt?.seconds ?? 0;
+                    // Only count grants still within 90-day validity window
+                    if ((sec * 1000 + COMP_VALIDITY_MS) >= now) {
+                        map[staffId] = (map[staffId] || 0) + (grantedDays || 0);
+                    }
+                });
+                setCompGrantsMap(map);
+            } catch (err) {
+                console.error("Failed to fetch comp grants:", err);
+            }
+        };
+
+        fetchCompGrants();
+    }, [userData?.department]);
 
     useEffect(() => {
         if (!db) return;
@@ -201,7 +234,15 @@ function AdminRequestManagerContent() {
                                             <div className="flex items-center gap-1 mt-1 text-xs text-blue-600 font-medium">
                                                 <CalendarClock className="h-3 w-3" />
                                                 <span>
-                                                    Balance: {Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0))} / {LEAVE_LIMITS[leave.type as LeaveType] || "-"}
+                                                    Balance: {
+                                                        (() => {
+                                                            const effectiveLimit = leave.type === "Compensatory Leave"
+                                                                ? (compGrantsMap[leave.userId] || 0)
+                                                                : (LEAVE_LIMITS[leave.type as LeaveType] || 0);
+                                                            const remaining = Math.max(0, effectiveLimit - (leaveUsageMap[leave.userId]?.[leave.type] || 0));
+                                                            return `${remaining} / ${effectiveLimit}`;
+                                                        })()
+                                                    }
                                                 </span>
                                             </div>
                                         </div>
@@ -279,12 +320,17 @@ function AdminRequestManagerContent() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0)) === 0
-                                                        ? 'bg-red-100 text-red-700'
-                                                        : 'bg-blue-50 text-blue-700'
-                                                        }`}>
-                                                        {Math.max(0, (LEAVE_LIMITS[leave.type as LeaveType] || 0) - (leaveUsageMap[leave.userId]?.[leave.type] || 0))} left
-                                                    </span>
+                                                    {(() => {
+                                                        const effectiveLimit = leave.type === "Compensatory Leave"
+                                                            ? (compGrantsMap[leave.userId] || 0)
+                                                            : (LEAVE_LIMITS[leave.type as LeaveType] || 0);
+                                                        const remaining = Math.max(0, effectiveLimit - (leaveUsageMap[leave.userId]?.[leave.type] || 0));
+                                                        return (
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${remaining === 0 ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+                                                                {remaining} left
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="text-sm font-medium text-gray-900">{leave.type}</div>

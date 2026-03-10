@@ -20,6 +20,7 @@ export default function HodDashboard() {
     });
     const [loading, setLoading] = useState(true);
     const [myLeaves, setMyLeaves] = useState<any[]>([]);
+    const [compLeaveInfo, setCompLeaveInfo] = useState<{ granted: number; minGrantSeconds: number }>({ granted: 0, minGrantSeconds: Infinity });
 
     useEffect(() => {
         if (!db || !user || !userData?.department) return;
@@ -87,6 +88,37 @@ export default function HodDashboard() {
         };
     }, [user, userData]);
 
+    // Fetch HOD's own comp leave granted balance
+    useEffect(() => {
+        if (!user || !db) return;
+
+        const fetchCompLeave = async () => {
+            try {
+                const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000;
+                const now = Date.now();
+                const q = query(
+                    collection(db, "compLeaveGrants"),
+                    where("staffId", "==", user.uid),
+                    where("status", "==", "Approved")
+                );
+                const snap = await getDocs(q);
+                const validDocs = snap.docs.filter(d => {
+                    const sec = d.data().createdAt?.seconds ?? 0;
+                    return (sec * 1000 + COMP_VALIDITY_MS) >= now;
+                });
+                const total = validDocs.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
+                const minGrantSeconds = validDocs.length > 0
+                    ? Math.min(...validDocs.map(d => d.data().createdAt?.seconds ?? Infinity))
+                    : Infinity;
+                setCompLeaveInfo({ granted: total, minGrantSeconds });
+            } catch (err) {
+                console.error("Failed to fetch comp leave grants:", err);
+            }
+        };
+
+        fetchCompLeave();
+    }, [user]);
+
 
     const statCards = [
         { name: "Total Staff", value: loading ? "..." : stats.totalStaff, icon: Users, color: "text-purple-600", bg: "bg-purple-100", href: "/hod/staffs" },
@@ -122,25 +154,29 @@ export default function HodDashboard() {
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Leave Balances (Used / Total)</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {Object.entries(LEAVE_LIMITS).map(([type, limit]) => {
-                            // Calculate used leaves for this type in current year
                             const currentYear = new Date().getFullYear();
                             const used = myLeaves
-                                .filter(l =>
-                                    l.type === type &&
-                                    l.status === 'Approved' &&
-                                    (l.fromDate ? new Date(l.fromDate).getFullYear() === currentYear : true)
-                                )
+                                .filter(l => {
+                                    if (l.type !== type || l.status !== 'Approved') return false;
+                                    if (l.fromDate && new Date(l.fromDate).getFullYear() !== currentYear) return false;
+                                    if (type === "Compensatory Leave") {
+                                        const createdSec = l.createdAt?.seconds ?? 0;
+                                        return createdSec >= compLeaveInfo.minGrantSeconds;
+                                    }
+                                    return true;
+                                })
                                 .reduce((acc, curr) => acc + (curr.leaveValue || 0), 0);
 
-                            const percentage = Math.min((used / limit) * 100, 100);
-                            const isNearLimit = percentage >= 80;
+                            const effectiveLimit = type === "Compensatory Leave" ? compLeaveInfo.granted : limit;
+                            const percentage = effectiveLimit > 0 ? Math.min((used / effectiveLimit) * 100, 100) : 0;
+                            const isNearLimit = effectiveLimit > 0 && percentage >= 80;
 
                             return (
                                 <div key={type} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-sm font-medium text-gray-700 truncate" title={type}>{type}</span>
                                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isNearLimit ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                            {used}/{limit}
+                                            {used}/{effectiveLimit}
                                         </span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -149,6 +185,9 @@ export default function HodDashboard() {
                                             style={{ width: `${percentage}%` }}
                                         ></div>
                                     </div>
+                                    {type === "Compensatory Leave" && effectiveLimit === 0 && (
+                                        <p className="text-[10px] text-gray-400 italic mt-1">No grants yet</p>
+                                    )}
                                 </div>
                             );
                         })}
