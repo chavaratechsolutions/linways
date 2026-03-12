@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
@@ -66,6 +66,16 @@ export default function HodHistoryPage() {
         return () => unsubscribe();
     }, [user]);
 
+    const handleCancel = async (id: string) => {
+        if (!confirm("Are you sure you want to cancel this leave request? This action cannot be undone.")) return;
+        try {
+            await deleteDoc(doc(db, "leaves", id));
+        } catch (error) {
+            console.error("Error cancelling leave:", error);
+            alert("Failed to cancel the leave request. Please try again.");
+        }
+    };
+
     const getStatusStyle = (status: string) => {
         switch (status) {
             case "Approved": return "bg-green-100 text-green-800 border-green-200";
@@ -117,9 +127,19 @@ export default function HodHistoryPage() {
                                     <span className="text-xs text-gray-400">
                                         {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
                                     </span>
-                                    <span className="text-xs font-semibold text-blue-600 uppercase">
-                                        {leave.leaveValue} Day(s)
-                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-semibold text-blue-600 uppercase">
+                                            {leave.leaveValue} Day(s)
+                                        </span>
+                                        {(leave.status === "Pending" || leave.status === "Recommended") && (
+                                            <button
+                                                onClick={() => handleCancel(leave.id)}
+                                                className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))
@@ -137,13 +157,14 @@ export default function HodHistoryPage() {
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Date(s)</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Reason</th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
-                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400">Loading history...</td></tr>
+                                    <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">Loading history...</td></tr>
                                 ) : leaves.length === 0 ? (
-                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic py-16">No leave requests found.</td></tr>
+                                    <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic py-16">No leave requests found.</td></tr>
                                 ) : (
                                     leaves.map((leave) => (
                                         <tr key={leave.id} className="hover:bg-gray-50 transition-colors">
@@ -165,6 +186,18 @@ export default function HodHistoryPage() {
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(leave.status)}`}>
                                                     {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {(leave.status === "Pending" || leave.status === "Recommended") ? (
+                                                    <button
+                                                        onClick={() => handleCancel(leave.id)}
+                                                        className="inline-block px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 italic">No actions</span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))

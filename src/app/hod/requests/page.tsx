@@ -102,10 +102,11 @@ function AdminRequestManagerContent() {
                 const snap = await getDocs(q);
                 const map: Record<string, number> = {};
                 snap.docs.forEach(d => {
-                    const { staffId, grantedDays, createdAt } = d.data();
-                    const sec = createdAt?.seconds ?? 0;
+                    const data = d.data();
+                    const { staffId, grantedDays } = data;
+                    const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
                     // Only count grants still within 90-day validity window
-                    if ((sec * 1000 + COMP_VALIDITY_MS) >= now) {
+                    if ((workDateMs + COMP_VALIDITY_MS) >= now) {
                         map[staffId] = (map[staffId] || 0) + (grantedDays || 0);
                     }
                 });

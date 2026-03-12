@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
@@ -65,6 +65,16 @@ export default function StaffHistoryPage() {
         return () => unsubscribe();
     }, [user]);
 
+    const handleCancel = async (id: string) => {
+        if (!confirm("Are you sure you want to cancel this leave request? This action cannot be undone.")) return;
+        try {
+            await deleteDoc(doc(db, "leaves", id));
+        } catch (error) {
+            console.error("Error cancelling leave:", error);
+            alert("Failed to cancel the leave request. Please try again.");
+        }
+    };
+
     const getStatusStyle = (status: string) => {
         switch (status) {
             case "Approved": return "bg-green-100 text-green-800 border-green-200";
@@ -120,12 +130,20 @@ export default function StaffHistoryPage() {
                                             {leave.leaveValue} Day(s)
                                         </span>
                                         {leave.status === "Pending" && (
-                                            <a
-                                                href={`/staff/edit/${leave.id}`}
-                                                className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
-                                            >
-                                                Edit
-                                            </a>
+                                            <>
+                                                <a
+                                                    href={`/staff/edit/${leave.id}`}
+                                                    className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                                >
+                                                    Edit
+                                                </a>
+                                                <button
+                                                    onClick={() => handleCancel(leave.id)}
+                                                    className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -176,12 +194,20 @@ export default function StaffHistoryPage() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 {leave.status === "Pending" ? (
-                                                    <a
-                                                        href={`/staff/edit/${leave.id}`}
-                                                        className="inline-block px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
-                                                    >
-                                                        Edit
-                                                    </a>
+                                                    <div className="flex justify-end gap-2">
+                                                        <a
+                                                            href={`/staff/edit/${leave.id}`}
+                                                            className="inline-block px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                                        >
+                                                            Edit
+                                                        </a>
+                                                        <button
+                                                            onClick={() => handleCancel(leave.id)}
+                                                            className="inline-block px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     <span className="text-xs text-gray-400 italic">No actions</span>
                                                 )}

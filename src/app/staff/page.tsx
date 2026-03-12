@@ -125,12 +125,16 @@ function StaffDashboardContent() {
                 const snap = await getDocs(q);
                 // Only use grants still within 90-day validity window
                 const validDocs = snap.docs.filter(d => {
-                    const sec = d.data().createdAt?.seconds ?? 0;
-                    return (sec * 1000 + COMP_VALIDITY_MS) >= now;
+                    const data = d.data();
+                    const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
+                    return (workDateMs + COMP_VALIDITY_MS) >= now;
                 });
                 const total = validDocs.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
                 const minGrantSeconds = validDocs.length > 0
-                    ? Math.min(...validDocs.map(d => d.data().createdAt?.seconds ?? Infinity))
+                    ? Math.min(...validDocs.map(d => {
+                        const data = d.data();
+                        return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
+                    }))
                     : Infinity;
                 setCompLeaveInfo({ granted: total, minGrantSeconds });
             } catch (err) {

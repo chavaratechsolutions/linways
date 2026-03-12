@@ -63,8 +63,11 @@ service cloud.firestore {
         request.resource.data.userId == resource.data.userId
       );
       
-      // Admins can delete if needed, staff cannot
-      allow delete: if isAdmin();
+      // Admins can delete if needed, staff can delete their own only if still Pending or Recommended
+      allow delete: if isAdmin() || (
+        resource.data.userId == request.auth.uid && 
+        (resource.data.status == 'Pending' || resource.data.status == 'Recommended')
+      );
     }
 
     // Rules for the 'compLeaveGrants' collection

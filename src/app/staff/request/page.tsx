@@ -47,15 +47,19 @@ export default function LeaveRequestPage() {
 
                 // Only count grants still within 90-day validity window
                 const validGrants = grantsSnap.docs.filter(d => {
-                    const createdSec = d.data().createdAt?.seconds ?? 0;
-                    return (createdSec * 1000 + COMP_VALIDITY_MS) >= now;
+                    const data = d.data();
+                    const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
+                    return (workDateMs + COMP_VALIDITY_MS) >= now;
                 });
 
                 const totalGranted = validGrants.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
 
                 // Find the earliest valid grant timestamp — only count comp leave USED after that point
                 const minGrantSeconds = validGrants.length > 0
-                    ? Math.min(...validGrants.map(d => d.data().createdAt?.seconds ?? Infinity))
+                    ? Math.min(...validGrants.map(d => {
+                        const data = d.data();
+                        return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
+                    }))
                     : Infinity;
 
                 // Count comp leaves used after the first valid grant was issued
@@ -74,9 +78,10 @@ export default function LeaveRequestPage() {
                 let remainingUsed = totalUsed;
                 const sortedValidGrants = validGrants
                     .map(d => {
-                        const days = d.data().grantedDays || 0;
-                        const createdSec = d.data().createdAt?.seconds ?? 0;
-                        const expiresAt = createdSec * 1000 + COMP_VALIDITY_MS;
+                        const data = d.data();
+                        const days = data.grantedDays || 0;
+                        const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
+                        const expiresAt = workDateMs + COMP_VALIDITY_MS;
                         return { id: d.id, days, expiresAt };
                     })
                     .sort((a, b) => a.expiresAt - b.expiresAt); // Oldest expiry first

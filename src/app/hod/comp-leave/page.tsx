@@ -332,8 +332,8 @@ export default function ManageCompLeavePage() {
                             <div className="divide-y divide-gray-100 md:hidden">
                                 {grants.map((g) => {
                                     const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000;
-                                    const createdSec = g.createdAt?.seconds ?? 0;
-                                    const expiresAt = createdSec * 1000 + COMP_VALIDITY_MS;
+                                    const workDateMs = g.date ? new Date(g.date).getTime() : (g.createdAt?.seconds ?? 0) * 1000;
+                                    const expiresAt = workDateMs + COMP_VALIDITY_MS;
                                     const now = Date.now();
                                     const isExpired = g.status === "Approved" && expiresAt < now;
                                     const daysLeft = g.status === "Approved" ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
@@ -347,10 +347,10 @@ export default function ManageCompLeavePage() {
                                                     <p className="text-xs text-gray-500">{g.date ? format(new Date(g.date), "MMM dd, yyyy") : "-"}</p>
                                                 </div>
                                                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${g.status === "Approved"
-                                                        ? isExpired
-                                                            ? "bg-gray-100 text-gray-500 border-gray-200"
-                                                            : "bg-green-50 text-green-700 border-green-200"
-                                                        : "bg-red-50 text-red-700 border-red-200"
+                                                    ? isExpired
+                                                        ? "bg-gray-100 text-gray-500 border-gray-200"
+                                                        : "bg-green-50 text-green-700 border-green-200"
+                                                    : "bg-red-50 text-red-700 border-red-200"
                                                     }`}>
                                                     {g.status === "Approved" ? `+${g.grantedDays} Day` : "Rejected"}
                                                 </span>
@@ -389,8 +389,8 @@ export default function ManageCompLeavePage() {
                                     <tbody className="divide-y divide-gray-100">
                                         {grants.map((g) => {
                                             const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000;
-                                            const createdSec = g.createdAt?.seconds ?? 0;
-                                            const expiresAt = createdSec * 1000 + COMP_VALIDITY_MS;
+                                            const workDateMs = g.date ? new Date(g.date).getTime() : (g.createdAt?.seconds ?? 0) * 1000;
+                                            const expiresAt = workDateMs + COMP_VALIDITY_MS;
                                             const now = Date.now();
                                             const isExpired = g.status === "Approved" && expiresAt < now;
                                             const daysLeft = g.status === "Approved" ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
@@ -408,10 +408,10 @@ export default function ManageCompLeavePage() {
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${g.status === "Approved"
-                                                                ? isExpired
-                                                                    ? "bg-gray-100 text-gray-500 border-gray-200"
-                                                                    : "bg-green-50 text-green-700 border-green-200"
-                                                                : "bg-red-50 text-red-700 border-red-200"
+                                                            ? isExpired
+                                                                ? "bg-gray-100 text-gray-500 border-gray-200"
+                                                                : "bg-green-50 text-green-700 border-green-200"
+                                                            : "bg-red-50 text-red-700 border-red-200"
                                                             }`}>
                                                             {g.status === "Approved" ? `✓ +${g.grantedDays} Day` : "✗ Rejected"}
                                                         </span>
