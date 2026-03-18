@@ -252,8 +252,8 @@ function AdminRequestManagerContent() {
                                                 leave.status === "Recommended" ? "bg-blue-100 text-blue-700 border-blue-200" :
                                                     "bg-yellow-100 text-yellow-700 border-yellow-200"
                                             }`}>
-                                            {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
-                                        </span>
+                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "HOD Recommended") : leave.status}
+                                    </span>
                                     </div>
                                     <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">
                                         <p className="font-semibold text-xs uppercase text-blue-600 mb-1">{leave.type} ({leave.leaveValue} Days)</p>
@@ -353,7 +353,7 @@ function AdminRequestManagerContent() {
                                                             leave.status === "Recommended" ? "bg-blue-100 text-blue-700 border-blue-200" :
                                                                 "bg-yellow-100 text-yellow-700 border-yellow-200"
                                                         }`}>
-                                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
+                                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "HOD Recommended") : leave.status}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4">

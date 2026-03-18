@@ -117,7 +117,7 @@ export default function HodHistoryPage() {
                                         <p className="text-xs text-gray-500">{leave.session}</p>
                                     </div>
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(leave.status)}`}>
-                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
+                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "HOD Recommended") : leave.status}
                                     </span>
                                 </div>
                                 <div className="text-sm text-gray-600">
@@ -184,7 +184,7 @@ export default function HodHistoryPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(leave.status)}`}>
-                                                    {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "Recommended by HOD") : leave.status}
+                                                    {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "HOD Recommended") : leave.status}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">

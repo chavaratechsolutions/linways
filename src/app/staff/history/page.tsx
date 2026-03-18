@@ -12,7 +12,7 @@ interface LeaveRequest {
     id: string;
     userId: string;
     type: string;
-    status: "Pending" | "Approved" | "Rejected";
+    status: "Pending" | "Approved" | "Rejected" | "Recommended";
     reason: string;
     description: string;
     fromDate: string;
@@ -20,6 +20,7 @@ interface LeaveRequest {
     leaveValue: number;
     session: string;
     createdAt?: Timestamp;
+    recommendedBy?: string;
 }
 import { AlertCircle } from "lucide-react";
 
@@ -79,6 +80,7 @@ export default function StaffHistoryPage() {
         switch (status) {
             case "Approved": return "bg-green-100 text-green-800 border-green-200";
             case "Rejected": return "bg-red-100 text-red-800 border-red-200";
+            case "Recommended": return "bg-blue-100 text-blue-800 border-blue-200";
             default: return "bg-yellow-100 text-yellow-800 border-yellow-200";
         }
     };
@@ -115,7 +117,7 @@ export default function StaffHistoryPage() {
                                         <p className="text-xs text-gray-500">{leave.session}</p>
                                     </div>
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(leave.status)}`}>
-                                        {leave.status}
+                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "HOD Recommended") : leave.status}
                                     </span>
                                 </div>
                                 <div className="text-sm text-gray-600">
@@ -189,7 +191,7 @@ export default function StaffHistoryPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(leave.status)}`}>
-                                                    {leave.status}
+                                                    {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "HOD Recommended") : leave.status}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
