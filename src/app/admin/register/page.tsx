@@ -18,6 +18,7 @@ export default function RegisterStaffPage() {
     const [designation, setDesignation] = useState("");
     const [department, setDepartment] = useState("");
     const [status, setStatus] = useState("Active");
+    const [gender, setGender] = useState("");
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ text: "", type: "" });
@@ -46,6 +47,7 @@ export default function RegisterStaffPage() {
                 designation,
                 department,
                 status,
+                gender,
 
                 createdAt: new Date().toISOString(),
             });
@@ -64,6 +66,7 @@ export default function RegisterStaffPage() {
             setDesignation("");
             setDepartment("");
             setStatus("Active");
+            setGender("");
 
         } catch (error: any) {
             console.error("Registration error:", error);
@@ -158,6 +161,22 @@ export default function RegisterStaffPage() {
 
                                 </select>
                             </div>
+                        </div>
+
+                        {/* Gender */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Gender</label>
+                            <select
+                                required
+                                value={gender}
+                                onChange={(e) => setGender(e.target.value)}
+                                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 shadow-sm focus:border-purple-500 focus:ring-purple-500 outline-none text-gray-900 bg-white"
+                            >
+                                <option value="" disabled>Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
                         </div>
 
                         {/* Service Details */}

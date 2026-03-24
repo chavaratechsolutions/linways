@@ -157,7 +157,12 @@ export default function HodDashboard() {
                 <div className="rounded-xl bg-white p-4 md:p-6 shadow-sm border border-gray-100">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Leave Balances (Used / Total)</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        {Object.entries(LEAVE_LIMITS).map(([type, limit]) => {
+                        {Object.entries(LEAVE_LIMITS)
+                            .filter(([type]) => {
+                                if (type === "Maternity Leave" && userData?.gender !== "Female") return false;
+                                return true;
+                            })
+                            .map(([type, limit]) => {
                             const currentYear = new Date().getFullYear();
                             const used = myLeaves
                                 .filter(l => {

@@ -19,6 +19,7 @@ export default function EditStaffModal({ staff, onClose }: EditStaffModalProps) 
         dateOfJoining: staff.dateOfJoining || "",
         appointmentNo: staff.appointmentNo || "",
         status: staff.status || "Active",
+        gender: staff.gender || "",
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -165,6 +166,20 @@ export default function EditStaffModal({ staff, onClose }: EditStaffModalProps) 
                                 <option value="Inactive">Inactive</option>
                                 <option value="On Leave">On Leave</option>
                                 <option value="Resigned">Resigned</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Gender</label>
+                            <select
+                                required
+                                value={formData.gender}
+                                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 outline-none focus:border-blue-500 bg-white text-gray-900"
+                            >
+                                <option value="" disabled>Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
                             </select>
                         </div>
                     </div>

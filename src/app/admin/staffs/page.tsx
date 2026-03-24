@@ -21,6 +21,7 @@ interface StaffData {
     service?: string;
     appointmentNo?: string;
     status?: string;
+    gender?: string;
     leavesUsed: number;
     leaveBalances: Record<string, number>;
     role?: string;
@@ -70,6 +71,7 @@ export default function AdminStaffOverview() {
                 service: doc.data().service,
                 appointmentNo: doc.data().appointmentNo,
                 status: doc.data().status,
+                gender: doc.data().gender,
                 leavesUsed: 0
             }));
 
@@ -254,7 +256,7 @@ export default function AdminStaffOverview() {
                                         <div className="overflow-hidden min-w-0">
                                             <h3 className="font-bold text-gray-900 truncate">{staff.displayName}</h3>
                                             <p className="text-xs text-gray-500 truncate">{staff.department} • {staff.designation}</p>
-                                            <p className="text-xs text-gray-400 truncate mt-0.5">{staff.email}</p>
+                                            <p className="text-xs text-gray-400 truncate mt-0.5">{staff.email} • {staff.gender || "N/A"}</p>
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-end gap-2 shrink-0">
@@ -323,14 +325,15 @@ export default function AdminStaffOverview() {
                                     <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center cursor-pointer hover:bg-gray-50" onClick={() => handleSort('remaining')}>
                                         <div className="flex items-center justify-center gap-1">Remaining <SortIcon columnKey="remaining" /></div>
                                     </th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Gender</th>
                                     <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
-                                    <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">Loading staff data...</td></tr>
+                                    <tr><td colSpan={9} className="px-6 py-12 text-center text-gray-400">Loading staff data...</td></tr>
                                 ) : sortedAndFilteredStaffs.length === 0 ? (
-                                    <tr><td colSpan={8} className="px-6 py-20 text-center text-gray-400 italic">{searchTerm ? "No staff members match your search." : "No staff members registered."}</td></tr>
+                                    <tr><td colSpan={9} className="px-6 py-20 text-center text-gray-400 italic">{searchTerm ? "No staff members match your search." : "No staff members registered."}</td></tr>
                                 ) : (
                                     sortedAndFilteredStaffs.map((staff, index) => (
                                         <tr key={staff.id} className="hover:bg-gray-50 transition-colors">
@@ -369,6 +372,7 @@ export default function AdminStaffOverview() {
                                                     ))}
                                                 </div>
                                             </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600 font-medium">{staff.gender || "-"}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <button
                                                     onClick={() => setEditingStaff(staff)}

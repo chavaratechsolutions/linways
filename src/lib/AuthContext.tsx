@@ -10,6 +10,7 @@ interface UserData {
     name?: string;
     designation?: string;
     department?: string;
+    gender?: string;
 }
 
 interface AuthContextType {
@@ -53,7 +54,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                                 setUserData({
                                     name: data.name || data.displayName || user.displayName,
                                     designation: data.designation,
-                                    department: data.department
+                                    department: data.department,
+                                    gender: data.gender
                                 });
                             }
                         } else {
