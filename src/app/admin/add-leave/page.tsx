@@ -16,6 +16,7 @@ interface User {
     department?: string;
     designation?: string;
     role: string;
+    gender?: string;
 }
 
 export default function AdminAddLeavePage() {
@@ -200,9 +201,14 @@ export default function AdminAddLeavePage() {
                                 value={formData.type}
                                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                             >
-                                {Object.keys(LEAVE_LIMITS).map(type => (
-                                    <option key={type} value={type}>{type}</option>
-                                ))}
+                                {Object.keys(LEAVE_LIMITS)
+                                    .filter(type => {
+                                        if (type === "Maternity Leave" && selectedUser?.gender !== "Female") return false;
+                                        return true;
+                                    })
+                                    .map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
                             </select>
                         </div>
 

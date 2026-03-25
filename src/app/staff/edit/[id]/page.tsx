@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
 
 export default function EditLeavePage({ params }: { params: Promise<{ id: string }> }) {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const router = useRouter();
     // Unwrap params using use() hook
     const resolvedParams = use(params);
@@ -261,7 +261,7 @@ export default function EditLeavePage({ params }: { params: Promise<{ id: string
                                 <option>Casual Leave</option>
                                 <option>Duty Leave</option>
                                 <option>Vacation Leave</option>
-                                <option>Maternity Leave</option>
+                                {userData?.gender === "Female" && <option>Maternity Leave</option>}
                                 <option>Compensatory Leave</option>
                             </select>
                         </div>

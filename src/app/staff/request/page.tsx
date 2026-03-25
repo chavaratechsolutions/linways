@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
 
 export default function LeaveRequestPage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -324,7 +324,7 @@ export default function LeaveRequestPage() {
                                 <option>Casual Leave</option>
                                 <option>Duty Leave</option>
                                 <option>Vacation Leave</option>
-                                <option>Maternity Leave</option>
+                                {userData?.gender === "Female" && <option>Maternity Leave</option>}
                                 <option>Compensatory Leave</option>
                             </select>
                             {isCompLeave && compLeaveBalance !== null && (() => {
