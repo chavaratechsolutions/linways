@@ -5,11 +5,12 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
 import { collection, query, onSnapshot, doc, updateDoc, where, getDocs } from "firebase/firestore";
 import { format, startOfYear, endOfYear } from "date-fns";
-import { Check, X, AlertCircle, CalendarClock } from "lucide-react";
+import { Check, X, AlertCircle, CalendarClock, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Timestamp } from "firebase/firestore";
-import { LEAVE_LIMITS, LeaveType } from "@/lib/constants";
+import { LEAVE_LIMITS, LeaveType, COMP_VALIDITY_MS } from "@/lib/constants";
 import { useAuth } from "@/lib/AuthContext";
+import DateRangePicker from "@/components/DateRangePicker";
 
 interface LeaveRequest {
     id: string;
@@ -27,17 +28,27 @@ interface LeaveRequest {
     recommendedBy?: string;
 }
 
+type SortKey = 'displayName' | 'type' | 'fromDate' | 'status';
+interface SortConfig {
+    key: SortKey;
+    direction: 'asc' | 'desc';
+}
+
 function AdminRequestManagerContent() {
     const { userData } = useAuth();
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
     const [staffMap, setStaffMap] = useState<Record<string, any>>({});
-    const [leaveUsageMap, setLeaveUsageMap] = useState<Record<string, Record<string, number>>>({});
-    const [compGrantsMap, setCompGrantsMap] = useState<Record<string, number>>({}); // staffId -> total granted comp leave days
+    const [rawLeaves, setRawLeaves] = useState<any[]>([]);
+    const [rawGrants, setRawGrants] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const searchParams = useSearchParams();
     const statusParam = searchParams.get("status") || "Pending";
     const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected" | "Recommended">(statusParam as any);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filterFromDate, setFilterFromDate] = useState("");
+    const [filterToDate, setFilterToDate] = useState("");
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'fromDate', direction: 'desc' });
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
     useEffect(() => {
@@ -49,7 +60,7 @@ function AdminRequestManagerContent() {
     // Fetch Staff Details
     useEffect(() => {
         if (!db) return;
-        const q = query(collection(db, "users"), where("role", "in", ["staff", "hod"])); // Fetch staff and hod to ensure map coverage
+        const q = query(collection(db, "users"), where("role", "in", ["staff", "hod", "princi", "dir"]));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const mapping: Record<string, any> = {};
             snapshot.docs.forEach(doc => {
@@ -60,69 +71,32 @@ function AdminRequestManagerContent() {
         return () => unsubscribe();
     }, []);
 
-    // ... (keep existing effects for leaves)
-
-    // Fetch Approved Leaves and Calculate Usage
+    // Fetch Raw Approved Leaves for Balance Calculation
     useEffect(() => {
         if (!db) return;
-        const currentYear = new Date().getFullYear();
-        const yearStart = format(startOfYear(new Date()), "yyyy-MM-dd");
-        const yearEnd = format(endOfYear(new Date()), "yyyy-MM-dd");
-
         const q = query(collection(db, "leaves"), where("status", "==", "Approved"));
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const usage: Record<string, Record<string, number>> = {};
-            snapshot.docs.forEach(doc => {
-                const data = doc.data();
-                if (data.fromDate >= yearStart && data.fromDate <= yearEnd) {
-                    if (!usage[data.userId]) usage[data.userId] = {};
-                    usage[data.userId][data.type] = (usage[data.userId][data.type] || 0) + (data.leaveValue || 0);
-                }
-            });
-            setLeaveUsageMap(usage);
+        return onSnapshot(q, (snapshot) => {
+            setRawLeaves(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
-
-        return () => unsubscribe();
     }, []);
 
-    // Fetch Comp Leave Grants per staff
+    // Fetch Comp Leave Grants
     useEffect(() => {
         if (!db || !userData?.department) return;
-
-        const fetchCompGrants = async () => {
-            try {
-                const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000;
-                const now = Date.now();
-                const q = query(
-                    collection(db, "compLeaveGrants"),
-                    where("department", "==", userData.department),
-                    where("status", "==", "Approved")
-                );
-                const snap = await getDocs(q);
-                const map: Record<string, number> = {};
-                snap.docs.forEach(d => {
-                    const data = d.data();
-                    const { staffId, grantedDays } = data;
-                    const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
-                    // Only count grants still within 90-day validity window
-                    if ((workDateMs + COMP_VALIDITY_MS) >= now) {
-                        map[staffId] = (map[staffId] || 0) + (grantedDays || 0);
-                    }
-                });
-                setCompGrantsMap(map);
-            } catch (err) {
-                console.error("Failed to fetch comp grants:", err);
-            }
-        };
-
-        fetchCompGrants();
+        const q = query(
+            collection(db, "compLeaveGrants"),
+            where("department", "==", userData.department),
+            where("status", "==", "Approved")
+        );
+        return onSnapshot(q, (snapshot) => {
+            setRawGrants(snapshot.docs.map(doc => doc.data()));
+        });
     }, [userData?.department]);
 
+    // Main Leaves Listener (for the request list)
     useEffect(() => {
         if (!db) return;
-        const q = query(collection(db, "leaves")); // Fetch all leaves, then filter in memory
-
+        const q = query(collection(db, "leaves"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const leavesData = snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -130,9 +104,9 @@ function AdminRequestManagerContent() {
             })) as LeaveRequest[];
 
             leavesData.sort((a, b) => {
-                const timeA = a.createdAt?.seconds || 0;
-                const timeB = b.createdAt?.seconds || 0;
-                return timeB - timeA;
+                const dateA = new Date(a.fromDate).getTime();
+                const dateB = new Date(b.fromDate).getTime();
+                return dateB - dateA;
             });
 
             setLeaves(leavesData);
@@ -166,19 +140,82 @@ function AdminRequestManagerContent() {
     const filteredLeaves = leaves.filter(l => {
         // 1. Filter by Department
         const staff = staffMap[l.userId];
-        // If userData or staff map isn't fully ready, or department doesn't match, hide it.
-        // Also ensure user sees their own requests if needed? No, this is "Manage Requests", so probably not their own.
-        // HOD should see requests from Staff in their department.
-
-        // Strict Check: Must have staff record and matching department
         if (!userData?.department || !staff?.department || staff.department !== userData.department) {
             return false;
         }
 
-        // 2. Filter by Status
+        // 2. Filter by Search Term
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = !searchTerm ||
+            ((staff?.displayName || "").toLowerCase().includes(searchLower) ||
+                (l.userEmail || "").toLowerCase().includes(searchLower));
+
+        // 3. Filter by Date Range
+        let matchesDate = true;
+        if (filterFromDate || filterToDate) {
+            const leaveStartDate = l.fromDate;
+            const leaveEndDate = l.toDate;
+
+            if (filterFromDate && filterToDate) {
+                matchesDate = leaveEndDate >= filterFromDate && leaveStartDate <= filterToDate;
+            } else if (filterFromDate) {
+                matchesDate = leaveEndDate >= filterFromDate;
+            } else if (filterToDate) {
+                matchesDate = leaveStartDate <= filterToDate;
+            }
+        }
+
+        if (!matchesSearch || !matchesDate) return false;
+
+        // 4. Filter by Status
         if (filter === "All") return true;
         return l.status === filter;
     });
+
+    const handleSort = (key: SortKey) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortedLeaves = (leaveList: LeaveRequest[]) => {
+        return [...leaveList].sort((a, b) => {
+            let aValue: any = '';
+            let bValue: any = '';
+
+            const staffA = staffMap[a.userId];
+            const staffB = staffMap[b.userId];
+
+            switch (sortConfig.key) {
+                case 'displayName':
+                    aValue = (staffA?.displayName || a.userEmail).toLowerCase();
+                    bValue = (staffB?.displayName || b.userEmail).toLowerCase();
+                    break;
+                case 'type':
+                    aValue = a.type.toLowerCase();
+                    bValue = b.type.toLowerCase();
+                    break;
+                case 'fromDate':
+                    aValue = new Date(a.fromDate).getTime();
+                    bValue = new Date(b.fromDate).getTime();
+                    break;
+                case 'status':
+                    aValue = a.status.toLowerCase();
+                    bValue = b.status.toLowerCase();
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    const sortedFilteredLeaves = getSortedLeaves(filteredLeaves);
 
     return (
         <DashboardLayout allowedRole="hod">
@@ -188,19 +225,45 @@ function AdminRequestManagerContent() {
                         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Manage Requests</h1>
                         <p className="text-sm text-gray-500 text-pretty">Review and respond to leave applications below.</p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {(["All", "Pending", "Recommended", "Approved", "Rejected"] as const).map((status) => (
-                            <button
-                                key={status}
-                                onClick={() => setFilter(status)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === status
-                                    ? "bg-blue-600 text-white shadow-md shadow-blue-200"
-                                    : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
-                                    }`}
-                            >
-                                {status}
-                            </button>
-                        ))}
+
+                    <div className="flex flex-col gap-3">
+                        <div className="relative w-full md:w-96">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search requests..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow shadow-sm"
+                            />
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
+                            <DateRangePicker
+                                startDate={filterFromDate}
+                                endDate={filterToDate}
+                                onDateChange={(start, end) => {
+                                    setFilterFromDate(start);
+                                    setFilterToDate(end);
+                                }}
+                            />
+                            <div className="h-8 w-px bg-gray-200 mx-1 hidden sm:block" />
+                            <div className="flex flex-wrap gap-2">
+                                {(["All", "Pending", "Recommended", "Approved", "Rejected"] as const).map((status) => (
+                                    <button
+                                        key={status}
+                                        onClick={() => setFilter(status)}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filter === status
+                                            ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                                            : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+                                            }`}
+                                    >
+                                        {status}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -214,14 +277,13 @@ function AdminRequestManagerContent() {
                 <div className="grid grid-cols-1 gap-4 lg:hidden">
                     {loading ? (
                         <div className="text-center py-12 text-gray-400">Loading requests...</div>
-                    ) : filteredLeaves.length === 0 ? (
+                    ) : sortedFilteredLeaves.length === 0 ? (
                         <div className="text-center py-12 text-gray-400 italic bg-white rounded-xl border border-gray-100">
                             No {filter.toLowerCase()} requests found.
                         </div>
                     ) : (
-                        filteredLeaves.map((leave) => {
+                        sortedFilteredLeaves.map((leave) => {
                             const staff = staffMap[leave.userId];
-                            const leavesUsed = leaveUsageMap[leave.userId] || 0;
                             return (
                                 <div key={leave.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
                                     <div className="flex justify-between items-start">
@@ -237,11 +299,40 @@ function AdminRequestManagerContent() {
                                                 <span>
                                                     Balance: {
                                                         (() => {
-                                                            const effectiveLimit = leave.type === "Compensatory Leave"
-                                                                ? (compGrantsMap[leave.userId] || 0)
-                                                                : (LEAVE_LIMITS[leave.type as LeaveType] || 0);
-                                                            const remaining = Math.max(0, effectiveLimit - (leaveUsageMap[leave.userId]?.[leave.type] || 0));
-                                                            return `${remaining} / ${effectiveLimit}`;
+                                                            const currentYear = new Date().getFullYear();
+                                                            const yearStart = format(startOfYear(new Date()), "yyyy-MM-dd");
+                                                            const yearEnd = format(endOfYear(new Date()), "yyyy-MM-dd");
+                                                            const now = Date.now();
+
+                                                            if (leave.type === "Compensatory Leave") {
+                                                                const userGrants = rawGrants.filter(g => g.staffId === leave.userId);
+                                                                const validGrants = userGrants.filter(data => {
+                                                                    const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
+                                                                    return (workDateMs + COMP_VALIDITY_MS) >= now;
+                                                                });
+
+                                                                const totalGranted = validGrants.reduce((sum, g) => sum + (g.grantedDays || 0), 0);
+                                                                const minGrantSeconds = validGrants.length > 0
+                                                                    ? Math.min(...validGrants.map(data => {
+                                                                        return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
+                                                                    }))
+                                                                    : Infinity;
+
+                                                                const userLeaves = rawLeaves.filter(l => l.userId === leave.userId);
+                                                                const compUsed = userLeaves
+                                                                    .filter(l => l.type === "Compensatory Leave" && (l.createdAt?.seconds ?? 0) >= minGrantSeconds)
+                                                                    .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
+
+                                                                const remaining = Math.max(0, totalGranted - compUsed);
+                                                                return `${remaining} / ${totalGranted}`;
+                                                            } else {
+                                                                const limit = LEAVE_LIMITS[leave.type as LeaveType] || 0;
+                                                                const used = rawLeaves
+                                                                    .filter(l => l.userId === leave.userId && l.type === leave.type && l.fromDate >= yearStart && l.fromDate <= yearEnd)
+                                                                    .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
+                                                                const remaining = Math.max(0, limit - used);
+                                                                return `${remaining} / ${limit}`;
+                                                            }
                                                         })()
                                                     }
                                                 </span>
@@ -290,24 +381,63 @@ function AdminRequestManagerContent() {
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-gray-50 border-b border-gray-100">
                                 <tr>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Staff Details</th>
+                                    <th
+                                        className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                        onClick={() => handleSort('displayName')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Staff Details
+                                            {sortConfig.key === 'displayName' ? (
+                                                sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />
+                                            ) : <ArrowUpDown className="h-3 w-3 text-gray-400" />}
+                                        </div>
+                                    </th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-center">Remaining Balance</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Type & Duration</th>
+                                    <th
+                                        className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                        onClick={() => handleSort('type')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Type & Duration
+                                            {sortConfig.key === 'type' ? (
+                                                sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />
+                                            ) : <ArrowUpDown className="h-3 w-3 text-gray-400" />}
+                                        </div>
+                                    </th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Reason & Details</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Dates</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Status</th>
+                                    <th
+                                        className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                        onClick={() => handleSort('fromDate')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Dates
+                                            {sortConfig.key === 'fromDate' ? (
+                                                sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />
+                                            ) : <ArrowUpDown className="h-3 w-3 text-gray-400" />}
+                                        </div>
+                                    </th>
+                                    <th
+                                        className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                        onClick={() => handleSort('status')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Status
+                                            {sortConfig.key === 'status' ? (
+                                                sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3 text-blue-600" /> : <ArrowDown className="h-3 w-3 text-blue-600" />
+                                            ) : <ArrowUpDown className="h-3 w-3 text-gray-400" />}
+                                        </div>
+                                    </th>
                                     <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
                                     <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading requests...</td></tr>
-                                ) : filteredLeaves.length === 0 ? (
+                                ) : sortedFilteredLeaves.length === 0 ? (
                                     <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 py-16">No {filter.toLowerCase()} requests found.</td></tr>
                                 ) : (
-                                    filteredLeaves.map((leave) => {
+                                    sortedFilteredLeaves.map((leave) => {
                                         const staff = staffMap[leave.userId];
-                                        const leavesUsed = leaveUsageMap[leave.userId] || 0;
                                         return (
                                             <tr key={leave.id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-6 py-4">
@@ -322,10 +452,41 @@ function AdminRequestManagerContent() {
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     {(() => {
-                                                        const effectiveLimit = leave.type === "Compensatory Leave"
-                                                            ? (compGrantsMap[leave.userId] || 0)
-                                                            : (LEAVE_LIMITS[leave.type as LeaveType] || 0);
-                                                        const remaining = Math.max(0, effectiveLimit - (leaveUsageMap[leave.userId]?.[leave.type] || 0));
+                                                        const currentYear = new Date().getFullYear();
+                                                        const yearStart = format(startOfYear(new Date()), "yyyy-MM-dd");
+                                                        const yearEnd = format(endOfYear(new Date()), "yyyy-MM-dd");
+                                                        const now = Date.now();
+
+                                                        let remaining = 0;
+
+                                                        if (leave.type === "Compensatory Leave") {
+                                                            const userGrants = rawGrants.filter(g => g.staffId === leave.userId);
+                                                            const validGrants = userGrants.filter(data => {
+                                                                const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
+                                                                return (workDateMs + COMP_VALIDITY_MS) >= now;
+                                                            });
+
+                                                            const totalGranted = validGrants.reduce((sum, g) => sum + (g.grantedDays || 0), 0);
+                                                            const minGrantSeconds = validGrants.length > 0
+                                                                ? Math.min(...validGrants.map(data => {
+                                                                    return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
+                                                                }))
+                                                                : Infinity;
+
+                                                            const userLeaves = rawLeaves.filter(l => l.userId === leave.userId);
+                                                            const compUsed = userLeaves
+                                                                .filter(l => l.type === "Compensatory Leave" && (l.createdAt?.seconds ?? 0) >= minGrantSeconds)
+                                                                .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
+
+                                                            remaining = Math.max(0, totalGranted - compUsed);
+                                                        } else {
+                                                            const limit = LEAVE_LIMITS[leave.type as LeaveType] || 0;
+                                                            const used = rawLeaves
+                                                                .filter(l => l.userId === leave.userId && l.type === leave.type && l.fromDate >= yearStart && l.fromDate <= yearEnd)
+                                                                .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
+                                                            remaining = Math.max(0, limit - used);
+                                                        }
+
                                                         return (
                                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${remaining === 0 ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
                                                                 {remaining} left

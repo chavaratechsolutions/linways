@@ -8,7 +8,7 @@ import EditStaffModal from "./EditStaffModal";
 import { Users, AlertCircle, Calendar, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import Link from "next/link";
 import { format, startOfYear, endOfYear } from "date-fns";
-import { LEAVE_LIMITS, LeaveType } from "@/lib/constants";
+import { LEAVE_LIMITS, LeaveType, COMP_VALIDITY_MS } from "@/lib/constants";
 
 
 interface StaffData {
@@ -43,83 +43,114 @@ export default function AdminStaffOverview() {
     const [filterDepartment, setFilterDepartment] = useState("All");
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'displayName', direction: 'asc' });
 
-    // ... (useEffect hook remains roughly the same, but we need to ensure we map all fields)
+    const [rawUsers, setRawUsers] = useState<any[]>([]);
+    const [rawLeaves, setRawLeaves] = useState<any[]>([]);
+    const [rawGrants, setRawGrants] = useState<any[]>([]);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // 1. Fetch Users
     useEffect(() => {
         if (!db) return;
-        // 1. Fetch all staff members
         const staffQuery = query(collection(db, "users"), where("role", "in", ["staff", "princi", "dir", "hod"]));
-
-        // 2. Fetch all approved leaves for the current year
-        const currentYear = new Date().getFullYear();
-        const yearStart = format(startOfYear(new Date()), "yyyy-MM-dd");
-        const yearEnd = format(endOfYear(new Date()), "yyyy-MM-dd");
-
-        const unsubUsers = onSnapshot(staffQuery, (userSnap) => {
-            const users = userSnap.docs.map(doc => ({
-                id: doc.id,
-                email: doc.data().email,
-                displayName: doc.data().displayName || "N/A",
-                department: doc.data().department || "-",
-                designation: doc.data().designation || "-",
-                // capture other fields for editing
-                salutation: doc.data().salutation,
-                dateOfJoining: doc.data().dateOfJoining,
-                service: doc.data().service,
-                appointmentNo: doc.data().appointmentNo,
-                status: doc.data().status,
-                leavesUsed: 0,
-                role: doc.data().role || "staff"
-            }));
-
-
-            // ... (leaves fetching logic stays the same)
-            const leavesQuery = query(
-                collection(db, "leaves"),
-                where("status", "==", "Approved")
-            );
-
-            const unsubLeaves = onSnapshot(leavesQuery, (leaveSnap) => {
-                const leaves = leaveSnap.docs.map(doc => doc.data());
-
-                const updatedStaffs = users.map(user => {
-                    const userYearLeaves = leaves.filter(leave =>
-                        leave.userId === user.id &&
-                        leave.fromDate >= yearStart &&
-                        leave.fromDate <= yearEnd
-                    );
-                    const balances: Record<string, number> = {};
-                    Object.entries(LEAVE_LIMITS).forEach(([type, limit]) => {
-                        const used = userYearLeaves
-                            .filter(l => l.type === type)
-                            .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
-                        balances[type] = Math.max(0, limit - used);
-                    });
-
-                    return {
-                        ...user,
-                        leavesUsed: userYearLeaves.reduce((sum, leave) => sum + (leave.leaveValue || 0), 0),
-                        leaveBalances: balances
-                    };
-                });
-
-                setStaffs(updatedStaffs);
-                setLoading(false);
-            }, (err) => {
-                console.error("Leaves fetch error:", err);
-                setError("Failed to fetch leave data.");
-                setLoading(false);
-            });
-
-            return () => unsubLeaves();
-
+        return onSnapshot(staffQuery, (snap) => {
+            setRawUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (err) => {
             console.error("Users fetch error:", err);
             setError("Failed to fetch staff data.");
-            setLoading(false);
+        });
+    }, []);
+
+    // 2. Fetch Leaves
+    useEffect(() => {
+        if (!db) return;
+        const leavesQuery = query(collection(db, "leaves"), where("status", "==", "Approved"));
+        return onSnapshot(leavesQuery, (snap) => {
+            setRawLeaves(snap.docs.map(doc => doc.data()));
+        }, (err) => {
+            console.error("Leaves fetch error:", err);
+            setError("Failed to fetch leave data.");
+        });
+    }, []);
+
+    // 3. Fetch Grants
+    useEffect(() => {
+        if (!db) return;
+        const grantsQuery = query(collection(db, "compLeaveGrants"), where("status", "==", "Approved"));
+        return onSnapshot(grantsQuery, (snap) => {
+            setRawGrants(snap.docs.map(doc => doc.data()));
+        }, (err) => {
+            console.error("Grants fetch error:", err);
+            setError("Failed to fetch grant data.");
+        });
+    }, []);
+
+    // 4. Compute Staff Data
+    useEffect(() => {
+        const currentYear = new Date().getFullYear();
+        const yearStart = format(startOfYear(new Date()), "yyyy-MM-dd");
+        const yearEnd = format(endOfYear(new Date()), "yyyy-MM-dd");
+        const now = Date.now();
+
+        const updatedStaffs = rawUsers.map(user => {
+            const userLeaves = rawLeaves.filter(l => l.userId === user.id);
+            const userYearLeaves = userLeaves.filter(leave =>
+                leave.fromDate >= yearStart &&
+                leave.fromDate <= yearEnd
+            );
+
+            const balances: Record<string, number> = {};
+
+            Object.entries(LEAVE_LIMITS).forEach(([type, limit]) => {
+                if (type === "Compensatory Leave") {
+                    const userGrants = rawGrants.filter(g => g.staffId === user.id);
+                    const validGrants = userGrants.filter(data => {
+                        const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
+                        return (workDateMs + COMP_VALIDITY_MS) >= now;
+                    });
+
+                    const totalGranted = validGrants.reduce((sum, g) => sum + (g.grantedDays || 0), 0);
+                    const minGrantSeconds = validGrants.length > 0
+                        ? Math.min(...validGrants.map(data => {
+                            return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
+                        }))
+                        : Infinity;
+
+                    const compUsed = userLeaves
+                        .filter(l => l.type === "Compensatory Leave" && (l.createdAt?.seconds ?? 0) >= minGrantSeconds)
+                        .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
+
+                    balances[type] = Math.max(0, totalGranted - compUsed);
+                } else {
+                    const used = userYearLeaves
+                        .filter(l => l.type === type)
+                        .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
+                    balances[type] = Math.max(0, limit - used);
+                }
+            });
+
+            return {
+                id: user.id,
+                email: user.email,
+                displayName: user.displayName || "N/A",
+                department: user.department || "-",
+                designation: user.designation || "-",
+                salutation: user.salutation,
+                dateOfJoining: user.dateOfJoining,
+                service: user.service,
+                appointmentNo: user.appointmentNo,
+                status: user.status,
+                leavesUsed: userYearLeaves.reduce((sum, leave) => sum + (leave.leaveValue || 0), 0),
+                leaveBalances: balances,
+                role: user.role || "staff"
+            };
         });
 
-        return () => unsubUsers();
-    }, []);
+        setStaffs(updatedStaffs);
+        setLoading(false);
+    }, [rawUsers, rawLeaves, rawGrants]);
 
     useEffect(() => {
         setMounted(true);

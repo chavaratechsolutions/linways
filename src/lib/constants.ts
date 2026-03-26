@@ -7,3 +7,5 @@ export const LEAVE_LIMITS = {
 } as const;
 
 export type LeaveType = keyof typeof LEAVE_LIMITS;
+
+export const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000; // 90 days in ms
