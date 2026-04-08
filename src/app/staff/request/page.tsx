@@ -54,15 +54,7 @@ export default function LeaveRequestPage() {
 
                 const totalGranted = validGrants.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
 
-                // Find the earliest valid grant timestamp — only count comp leave USED after that point
-                const minGrantSeconds = validGrants.length > 0
-                    ? Math.min(...validGrants.map(d => {
-                        const data = d.data();
-                        return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
-                    }))
-                    : Infinity;
-
-                // Count comp leaves used after the first valid grant was issued
+                // Count comp leaves taken from 25 March 2026 onwards
                 const usedQ = query(
                     collection(db, "leaves"),
                     where("userId", "==", user.uid),
@@ -71,7 +63,7 @@ export default function LeaveRequestPage() {
                 );
                 const usedSnap = await getDocs(usedQ);
                 const totalUsed = usedSnap.docs
-                    .filter(d => (d.data().createdAt?.seconds ?? 0) >= minGrantSeconds)
+                    .filter(d => (d.data().fromDate || "") >= "2026-03-25")
                     .reduce((sum, d) => sum + (d.data().leaveValue || 0), 0);
 
                 // Build detailed list of individual grants for the UI

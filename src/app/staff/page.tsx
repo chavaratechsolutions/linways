@@ -43,7 +43,7 @@ function StaffDashboardContent() {
         approved: 0,
         rejected: 0,
     });
-    const [compLeaveInfo, setCompLeaveInfo] = useState<{ granted: number; minGrantSeconds: number }>({ granted: 0, minGrantSeconds: Infinity });
+    const [compLeaveInfo, setCompLeaveInfo] = useState<{ granted: number }>({ granted: 0 });
     const searchParams = useSearchParams();
     const router = useRouter();
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
@@ -130,13 +130,7 @@ function StaffDashboardContent() {
                     return (workDateMs + COMP_VALIDITY_MS) >= now;
                 });
                 const total = validDocs.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
-                const minGrantSeconds = validDocs.length > 0
-                    ? Math.min(...validDocs.map(d => {
-                        const data = d.data();
-                        return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
-                    }))
-                    : Infinity;
-                setCompLeaveInfo({ granted: total, minGrantSeconds });
+                setCompLeaveInfo({ granted: total });
             } catch (err) {
                 console.error("Failed to fetch comp leave grants:", err);
             }
@@ -210,46 +204,45 @@ function StaffDashboardContent() {
                                 return true;
                             })
                             .map(([type, limit]) => {
-                            // Calculate used leaves for this type in current year
-                            const currentYear = new Date().getFullYear();
-                            const used = leaves
-                                .filter(l => {
-                                    if (l.type !== type || l.status !== 'Approved') return false;
-                                    if (l.fromDate && new Date(l.fromDate).getFullYear() !== currentYear) return false;
-                                    // For Comp Leave: only count leaves applied AFTER the first HOD grant
-                                    if (type === "Compensatory Leave") {
-                                        const createdSec = (l.createdAt as any)?.seconds ?? 0;
-                                        return createdSec >= compLeaveInfo.minGrantSeconds;
-                                    }
-                                    return true;
-                                })
-                                .reduce((acc, curr) => acc + (curr.leaveValue || 0), 0);
+                                // Calculate used leaves for this type in current year
+                                const currentYear = new Date().getFullYear();
+                                const used = leaves
+                                    .filter(l => {
+                                        if (l.type !== type || l.status !== 'Approved') return false;
+                                        if (l.fromDate && new Date(l.fromDate).getFullYear() !== currentYear) return false;
+                                        // For Comp Leave: only count leaves taken from 25 March 2026 onwards
+                                        if (type === "Compensatory Leave") {
+                                            return (l.fromDate || "") >= "2026-03-25";
+                                        }
+                                        return true;
+                                    })
+                                    .reduce((acc, curr) => acc + (curr.leaveValue || 0), 0);
 
-                            // For Compensatory Leave, use the dynamically granted limit
-                            const effectiveLimit = type === "Compensatory Leave" ? compLeaveInfo.granted : limit;
-                            const percentage = effectiveLimit > 0 ? Math.min((used / effectiveLimit) * 100, 100) : 0;
-                            const isNearLimit = effectiveLimit > 0 && percentage >= 80;
+                                // For Compensatory Leave, use the dynamically granted limit
+                                const effectiveLimit = type === "Compensatory Leave" ? compLeaveInfo.granted : limit;
+                                const percentage = effectiveLimit > 0 ? Math.min((used / effectiveLimit) * 100, 100) : 0;
+                                const isNearLimit = effectiveLimit > 0 && percentage >= 80;
 
-                            return (
-                                <div key={type} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm font-medium text-gray-700 truncate" title={type}>{type}</span>
-                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isNearLimit ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                            {used}/{effectiveLimit}
-                                        </span>
+                                return (
+                                    <div key={type} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-sm font-medium text-gray-700 truncate" title={type}>{type}</span>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isNearLimit ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                                {used}/{effectiveLimit}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div
+                                                className={`h-2 rounded-full transition-all duration-500 ${isNearLimit ? 'bg-red-500' : 'bg-green-500'}`}
+                                                style={{ width: `${percentage}%` }}
+                                            ></div>
+                                        </div>
+                                        {type === "Compensatory Leave" && effectiveLimit === 0 && (
+                                            <p className="text-[10px] text-gray-400 italic mt-1">No grants yet</p>
+                                        )}
                                     </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
-                                        <div
-                                            className={`h-2 rounded-full transition-all duration-500 ${isNearLimit ? 'bg-red-500' : 'bg-green-500'}`}
-                                            style={{ width: `${percentage}%` }}
-                                        ></div>
-                                    </div>
-                                    {type === "Compensatory Leave" && effectiveLimit === 0 && (
-                                        <p className="text-[10px] text-gray-400 italic mt-1">No grants yet</p>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
                     </div>
                 </div>
 

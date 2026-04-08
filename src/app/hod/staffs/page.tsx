@@ -122,16 +122,9 @@ export default function AdminStaffOverview() {
 
                     const totalGranted = validGrants.reduce((sum, g) => sum + (g.grantedDays || 0), 0);
 
-                    // Find earliest valid grant timestamp
-                    const minGrantSeconds = validGrants.length > 0
-                        ? Math.min(...validGrants.map(data => {
-                            return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
-                        }))
-                        : Infinity;
-
-                    // Count comp leaves used after the first valid grant
+                    // Count comp leaves taken from 25 March 2026 onwards
                     const compUsed = userLeaves
-                        .filter(l => l.type === "Compensatory Leave" && (l.createdAt?.seconds ?? 0) >= minGrantSeconds)
+                        .filter(l => l.type === "Compensatory Leave" && (l.fromDate || "") >= "2026-03-25")
                         .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
 
                     balances[type] = Math.max(0, totalGranted - compUsed);
