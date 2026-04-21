@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
+import { LEAVE_LIMITS, LeaveType } from "@/lib/constants";
 
 export default function LeaveRequestPage() {
     const { user, userData } = useAuth();
@@ -26,6 +27,7 @@ export default function LeaveRequestPage() {
         nearestExpiryMs: number | null;
         grantsList: { id: string; days: number; expiresAt: number; available: number }[];
     } | null>(null);
+    const [leaveBalance, setLeaveBalance] = useState<{ used: number; limit: number } | null>(null);
     const isCompLeave = formData.type === "Compensatory Leave";
 
     // Fetch compensatory leave balance when type changes
@@ -58,12 +60,14 @@ export default function LeaveRequestPage() {
                 const usedQ = query(
                     collection(db, "leaves"),
                     where("userId", "==", user.uid),
-                    where("type", "==", "Compensatory Leave"),
-                    where("status", "==", "Approved")
+                    where("type", "==", "Compensatory Leave")
                 );
                 const usedSnap = await getDocs(usedQ);
                 const totalUsed = usedSnap.docs
-                    .filter(d => (d.data().fromDate || "") >= "2026-03-25")
+                    .filter(d => {
+                        const data = d.data();
+                        return data.status !== "Rejected" && (data.fromDate || "") >= "2026-03-25";
+                    })
                     .reduce((sum, d) => sum + (d.data().leaveValue || 0), 0);
 
                 // Build detailed list of individual grants for the UI
@@ -95,6 +99,40 @@ export default function LeaveRequestPage() {
 
         fetchBalance();
     }, [user, isCompLeave]);
+
+    // Fetch leave balance for the currently selected (non-comp) leave type
+    useEffect(() => {
+        if (!user || isCompLeave) { setLeaveBalance(null); return; }
+
+        const fetchLeaveBalance = async () => {
+            try {
+                const currentYear = new Date().getFullYear();
+                const currentType = formData.type as LeaveType;
+                const limit = LEAVE_LIMITS[currentType] ?? 0;
+
+                const q = query(
+                    collection(db, "leaves"),
+                    where("userId", "==", user.uid),
+                    where("type", "==", currentType)
+                );
+                const snap = await getDocs(q);
+                const used = snap.docs
+                    .filter(d => {
+                        const data = d.data();
+                        return data.status !== "Rejected" &&
+                            data.fromDate &&
+                            new Date(data.fromDate).getFullYear() === currentYear;
+                    })
+                    .reduce((sum, d) => sum + (d.data().leaveValue || 0), 0);
+
+                setLeaveBalance({ used, limit });
+            } catch (err) {
+                console.error("Failed to fetch leave balance:", err);
+            }
+        };
+
+        fetchLeaveBalance();
+    }, [user, formData.type, isCompLeave]);
 
     // Helper to check if a date is today
     const isToday = (dateString: string) => {
@@ -224,6 +262,22 @@ export default function LeaveRequestPage() {
             }
         }
 
+        // Yearly leave limit validation for standard leave types
+        if (!isCompLeave && leaveBalance !== null) {
+            const requested = calculateLeaveValue();
+            const remaining = leaveBalance.limit - leaveBalance.used;
+            if (remaining <= 0) {
+                alert(`You have used all your ${formData.type} allowance for this year (${leaveBalance.limit} days). You cannot apply for more.`);
+                setLoading(false);
+                return;
+            }
+            if (requested > remaining) {
+                alert(`You can only apply for ${remaining} more day(s) of ${formData.type} this year. You have requested ${requested} day(s).`);
+                setLoading(false);
+                return;
+            }
+        }
+
         // Validation
         if (formData.fromDate && formData.toDate) {
             const start = parseISO(formData.fromDate);
@@ -234,6 +288,29 @@ export default function LeaveRequestPage() {
                 alert("End date cannot be before start date.");
                 setLoading(false);
                 return;
+            }
+
+            // Vacation Leave date range restriction
+            if (formData.type === "Vacation Leave") {
+                const startMonth = start.getMonth() + 1;
+                const endMonth = end.getMonth() + 1;
+                
+                let hasAnyTimeGrant = false;
+                try {
+                    const grantDocRef = doc(db, "vacationLeave", user.uid);
+                    const grantDocSnap = await getDoc(grantDocRef);
+                    if (grantDocSnap.exists() && grantDocSnap.data().anyTime === "yes") {
+                        hasAnyTimeGrant = true;
+                    }
+                } catch (err) {
+                    console.error("Error checking vacation leave grant:", err);
+                }
+
+                if (!hasAnyTimeGrant && (startMonth < 5 || startMonth > 6 || endMonth < 5 || endMonth > 6)) {
+                    alert("Vacation Leave can only be applied between May 1st and June 30th.");
+                    setLoading(false);
+                    return;
+                }
             }
 
             // Prevent past dates

@@ -208,7 +208,7 @@ function StaffDashboardContent() {
                                 const currentYear = new Date().getFullYear();
                                 const used = leaves
                                     .filter(l => {
-                                        if (l.type !== type || l.status !== 'Approved') return false;
+                                        if (l.type !== type || l.status === 'Rejected') return false;
                                         if (l.fromDate && new Date(l.fromDate).getFullYear() !== currentYear) return false;
                                         // For Comp Leave: only count leaves taken from 25 March 2026 onwards
                                         if (type === "Compensatory Leave") {

@@ -111,6 +111,14 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         });
     }
 
+    if (role === "dir") {
+        adminLinks.push({
+            name: "Vacation Leave Grand",
+            href: "/director/vacation-leave-grand",
+            icon: FilePlus
+        });
+    }
+
     if (role === "hod") {
         adminLinks.push(
             { name: "Manage Comp Leave", href: "/hod/comp-leave", icon: FileUp },

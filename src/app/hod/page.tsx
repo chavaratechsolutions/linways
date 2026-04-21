@@ -166,7 +166,7 @@ export default function HodDashboard() {
                             const currentYear = new Date().getFullYear();
                             const used = myLeaves
                                 .filter(l => {
-                                    if (l.type !== type || l.status !== 'Approved') return false;
+                                    if (l.type !== type || l.status === 'Rejected') return false;
                                     if (l.fromDate && new Date(l.fromDate).getFullYear() !== currentYear) return false;
                                     if (type === "Compensatory Leave") {
                                         const createdSec = l.createdAt?.seconds ?? 0;

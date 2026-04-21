@@ -86,5 +86,14 @@ service cloud.firestore {
       // No one can update or delete a grant once created (immutable audit trail)
       allow update, delete: if getUserData().role == 'admin';
     }
+
+    // Rules for the 'vacationLeave' collection
+    match /vacationLeave/{staffId} {
+      // Staff can read their own vacation leave status; Admins/Directors can read all
+      allow read: if isAuthenticated() && (staffId == request.auth.uid || isAdmin());
+      
+      // Only admins/directors can grant vacation leaves
+      allow write: if isAdmin();
+    }
   }
 }

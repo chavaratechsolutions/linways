@@ -184,6 +184,29 @@ export default function EditLeavePage({ params }: { params: Promise<{ id: string
                 return;
             }
 
+            // Vacation Leave date range restriction
+            if (formData.type === "Vacation Leave") {
+                const startMonth = start.getMonth() + 1;
+                const endMonth = end.getMonth() + 1;
+                
+                let hasAnyTimeGrant = false;
+                try {
+                    const grantDocRef = doc(db, "vacationLeave", user.uid);
+                    const grantDocSnap = await getDoc(grantDocRef);
+                    if (grantDocSnap.exists() && grantDocSnap.data().anyTime === "yes") {
+                        hasAnyTimeGrant = true;
+                    }
+                } catch (err) {
+                    console.error("Error checking vacation leave grant:", err);
+                }
+
+                if (!hasAnyTimeGrant && (startMonth < 5 || startMonth > 6 || endMonth < 5 || endMonth > 6)) {
+                    alert("Vacation Leave can only be applied between May 1st and June 30th.");
+                    setSubmitting(false);
+                    return;
+                }
+            }
+
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             if (start < today) {
