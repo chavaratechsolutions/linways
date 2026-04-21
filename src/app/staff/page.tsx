@@ -196,7 +196,13 @@ function StaffDashboardContent() {
 
                 {/* Leave Balances Section */}
                 <div className="rounded-xl bg-white p-4 md:p-6 shadow-sm border border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Leave Balances (Used / Total)</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-2">Leave Balances (Used / Total)</h2>
+                    <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-4">
+                        <AlertCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-blue-700 leading-snug">
+                            Leave days are deducted as soon as you apply. They are <span className="font-semibold">only restored</span> if your request is <span className="font-semibold">rejected</span> by the HOD, Principal, or Director.
+                        </p>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {Object.entries(LEAVE_LIMITS)
                             .filter(([type]) => {
