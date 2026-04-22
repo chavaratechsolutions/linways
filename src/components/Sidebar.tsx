@@ -113,7 +113,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
     if (role === "dir") {
         adminLinks.push({
-            name: "Vacation Leave Grand",
+            name: "Vacation Leave Management",
             href: "/director/vacation-leave-grand",
             icon: FilePlus
         });

@@ -60,7 +60,7 @@ export default function VacationLeaveGrand() {
         const unsubVacation = onSnapshot(vacationQuery, (snap) => {
             const statusMap: Record<string, boolean> = {};
             snap.docs.forEach(d => {
-                if(d.data().anyTime === "yes") {
+                if (d.data().anyTime === "yes") {
                     statusMap[d.id] = true;
                 }
             });
@@ -145,7 +145,7 @@ export default function VacationLeaveGrand() {
                     <div className="flex flex-col gap-2">
                         <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
                             <Users className="h-6 w-6 text-blue-600" />
-                            Vacation Leave Grand
+                            Vacation Leave Management
                         </h1>
                     </div>
 
@@ -182,6 +182,22 @@ export default function VacationLeaveGrand() {
                     </div>
                 )}
 
+                {/* Disclosure Banner */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                    <div className="shrink-0 mt-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10A8 8 0 11 2 10a8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-sm font-semibold text-amber-800">Vacation Leave Policy</p>
+                        <ul className="text-sm text-amber-700 list-disc list-inside space-y-0.5">
+                            <li><span className="font-medium">Granted staff</span> — Can request and take vacation leave in <span className="font-medium">any month</span> of the year.</li>
+                            <li><span className="font-medium">Others (not granted)</span> — Can only request vacation leave during <span className="font-medium">May or June</span>.</li>
+                        </ul>
+                    </div>
+                </div>
+
                 {/* Mobile View: Cards */}
                 <div className="grid grid-cols-1 gap-4 xl:hidden">
                     {loading ? (
@@ -217,7 +233,7 @@ export default function VacationLeaveGrand() {
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                                    <button 
+                                    <button
                                         onClick={() => handleGrant(staff.id)}
                                         className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${grantedStatus[staff.id] ? 'bg-green-50 text-green-700 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                                         disabled={grantedStatus[staff.id]}
@@ -289,13 +305,13 @@ export default function VacationLeaveGrand() {
                                             <td className="px-6 py-4 text-sm text-gray-600">{staff.department}</td>
                                             <td className="px-6 py-4 text-sm text-gray-600">{staff.email}</td>
                                             <td className="px-6 py-4 text-center">
-                                                <button 
+                                                <button
                                                     onClick={() => handleGrant(staff.id)}
                                                     disabled={grantedStatus[staff.id]}
                                                     className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${grantedStatus[staff.id] ? 'bg-green-50 text-green-700 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'}`}
                                                 >
                                                     {grantedStatus[staff.id] ? (
-                                                        <span className="flex items-center gap-1 justify-center"><Check className="h-4 w-4"/> Granted</span>
+                                                        <span className="flex items-center gap-1 justify-center"><Check className="h-4 w-4" /> Granted</span>
                                                     ) : "Grant"}
                                                 </button>
                                             </td>
