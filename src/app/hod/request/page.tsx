@@ -200,9 +200,6 @@ export default function LeaveRequestPage() {
 
             // Vacation Leave date range restriction
             if (formData.type === "Vacation Leave") {
-                const startMonth = start.getMonth() + 1;
-                const endMonth = end.getMonth() + 1;
-                
                 let hasAnyTimeGrant = false;
                 try {
                     const grantDocRef = doc(db, "vacationLeave", user.uid);
@@ -214,10 +211,15 @@ export default function LeaveRequestPage() {
                     console.error("Error checking vacation leave grant:", err);
                 }
 
-                if (!hasAnyTimeGrant && (startMonth < 5 || startMonth > 6 || endMonth < 5 || endMonth > 6)) {
-                    alert("Vacation Leave can only be applied between May 1st and June 30th.");
-                    setLoading(false);
-                    return;
+                if (!hasAnyTimeGrant) {
+                    const currentYear = start.getFullYear();
+                    const rangeStart = new Date(currentYear, 3, 20); // April 20
+                    const rangeEnd = new Date(currentYear, 5, 30);   // June 30
+                    if (start < rangeStart || end > rangeEnd) {
+                        alert("Vacation Leave can only be applied between April 20th and June 30th.");
+                        setLoading(false);
+                        return;
+                    }
                 }
             }
 
