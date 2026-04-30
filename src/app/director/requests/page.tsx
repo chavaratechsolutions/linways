@@ -374,7 +374,7 @@ function AdminRequestManagerContent() {
                                 <div className="text-xs text-gray-400">
                                     {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
                                 </div>
-                                {(leave.status === "Pending" || (leave.status === "Recommended" && leave.recommendedBy === "HOD")) && (filter !== "All" || leave.type === "Compensatory Leave") && (
+                                {(leave.status === "Recommended" && leave.recommendedBy === "HOD") && (filter !== "All" || leave.type === "Compensatory Leave") && (
                                     <div className="flex gap-2 pt-2 border-t border-gray-100">
                                         <button
                                             onClick={() => handleAction(leave.id, "Recommended")}
@@ -542,7 +542,7 @@ function AdminRequestManagerContent() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-end gap-2">
-                                                    {(leave.status === "Pending" || (leave.status === "Recommended" && leave.recommendedBy === "HOD")) && (filter !== "All" || leave.type === "Compensatory Leave") ? (
+                                                    {(leave.status === "Recommended" && leave.recommendedBy === "HOD") && (filter !== "All" || leave.type === "Compensatory Leave") ? (
                                                         <>
                                                             <button
                                                                 onClick={() => handleAction(leave.id, "Recommended")}

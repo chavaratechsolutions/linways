@@ -200,6 +200,16 @@ export default function LeaveRequestPage() {
 
             // Vacation Leave date range restriction
             if (formData.type === "Vacation Leave") {
+                let current = new Date(start);
+                while (current <= end) {
+                    if (current.getDay() === 0 || current.getDay() === 6) {
+                        alert("Vacation Leave cannot include Saturdays or Sundays.");
+                        setLoading(false);
+                        return;
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
+
                 let hasAnyTimeGrant = false;
                 try {
                     const grantDocRef = doc(db, "vacationLeave", user.uid);
