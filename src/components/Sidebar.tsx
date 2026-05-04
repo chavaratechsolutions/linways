@@ -112,11 +112,10 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     }
 
     if (role === "dir") {
-        adminLinks.push({
-            name: "Vacation Leave Management",
-            href: "/director/vacation-leave-grand",
-            icon: FilePlus
-        });
+        adminLinks.push(
+            { name: "Vacation Leave Management", href: "/director/vacation-leave-grand", icon: FilePlus },
+            { name: "Add Leave", href: "/director/add-leave", icon: FilePlus }
+        );
     }
 
     if (role === "hod") {
