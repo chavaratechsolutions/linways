@@ -158,6 +158,7 @@ export default function RegisterStaffPage() {
                                     <option value="System Administrator">System Administrator</option>
                                     <option value="Network Administrator">Network Administrator</option>
                                     <option value="Administrative Staff">Administrative Staff</option>
+                                    <option value="Computer Programer">Computer Programer</option>
 
                                 </select>
                             </div>

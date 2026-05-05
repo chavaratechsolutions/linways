@@ -127,20 +127,30 @@ function AdminRequestManagerContent() {
     };
 
     const filteredLeaves = leaves.filter(l => {
-        // Compensatory Leave Workflow: Staff -> HOD -> Director -> Principal
-        if (l.type === "Compensatory Leave") {
-            if (filter === "Pending") {
-                if (!(l.status === "Recommended" && l.recommendedBy === "HOD")) {
+        const staff = staffMap[l.userId];
+        const isOfficeAdmin = staff?.department === "Office & Administration";
+
+        // For Office & Administration, Director acts as the direct approver
+        if (isOfficeAdmin) {
+            if (filter === "Pending" && l.status !== "Pending") return false;
+            if (filter === "Approved" && l.status !== "Approved") return false;
+            if (filter === "Rejected" && l.status !== "Rejected") return false;
+            if (filter === "Recommended" && l.status !== "Recommended") return false;
+        } else {
+            // Compensatory Leave Workflow: Staff -> HOD -> Director -> Principal
+            if (l.type === "Compensatory Leave") {
+                if (filter === "Pending") {
+                    if (!(l.status === "Recommended" && l.recommendedBy === "HOD")) {
+                        return false;
+                    }
+                }
+            } else {
+                if (filter !== "All" && filter !== "Approved" && filter !== "Rejected") {
                     return false;
                 }
             }
-        } else {
-            if (filter !== "All" && filter !== "Approved" && filter !== "Rejected") {
-                return false;
-            }
         }
 
-        const staff = staffMap[l.userId];
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch = !searchTerm ||
             ((staff?.displayName || "").toLowerCase().includes(searchLower) ||
@@ -168,6 +178,8 @@ function AdminRequestManagerContent() {
         if (!matchesSearch || !matchesDepartment || !matchesDate) return false;
 
         if (filter === "All") return true;
+
+        if (isOfficeAdmin) return true; // Status already handled above
 
         if (filter === "Pending") {
             return l.status === "Pending" || l.status === "Recommended";
@@ -374,7 +386,22 @@ function AdminRequestManagerContent() {
                                 <div className="text-xs text-gray-400">
                                     {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
                                 </div>
-                                {(leave.status === "Recommended" && leave.recommendedBy === "HOD") && (filter !== "All" || leave.type === "Compensatory Leave") && (
+                                {staff?.department === "Office & Administration" && leave.status === "Pending" ? (
+                                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                                        <button
+                                            onClick={() => handleAction(leave.id, "Approved")}
+                                            className="flex-1 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors"
+                                        >
+                                            Approve
+                                        </button>
+                                        <button
+                                            onClick={() => handleAction(leave.id, "Rejected")}
+                                            className="flex-1 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                        >
+                                            Reject
+                                        </button>
+                                    </div>
+                                ) : (leave.status === "Recommended" && leave.recommendedBy === "HOD") && (filter !== "All" || leave.type === "Compensatory Leave") && (
                                     <div className="flex gap-2 pt-2 border-t border-gray-100">
                                         <button
                                             onClick={() => handleAction(leave.id, "Recommended")}
@@ -542,7 +569,22 @@ function AdminRequestManagerContent() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-end gap-2">
-                                                    {(leave.status === "Recommended" && leave.recommendedBy === "HOD") && (filter !== "All" || leave.type === "Compensatory Leave") ? (
+                                                    {staff?.department === "Office & Administration" && leave.status === "Pending" ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleAction(leave.id, "Approved")}
+                                                                className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors"
+                                                            >
+                                                                Approve
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleAction(leave.id, "Rejected")}
+                                                                className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                            >
+                                                                Reject
+                                                            </button>
+                                                        </>
+                                                    ) : (leave.status === "Recommended" && leave.recommendedBy === "HOD") && (filter !== "All" || leave.type === "Compensatory Leave") ? (
                                                         <>
                                                             <button
                                                                 onClick={() => handleAction(leave.id, "Recommended")}
