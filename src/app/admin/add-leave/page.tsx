@@ -26,6 +26,7 @@ export default function AdminAddLeavePage() {
     const [users, setUsers] = useState<User[]>([]);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [message, setMessage] = useState({ text: "", type: "" });
+    const [statusOption, setStatusOption] = useState<"Approved" | "Pending">("Pending");
 
     // Form Data
     const [formData, setFormData] = useState({
@@ -104,7 +105,7 @@ export default function AdminAddLeavePage() {
         const leaveValue = calculateLeaveValue();
 
         try {
-            const dataToSave = {
+            const dataToSave: any = {
                 ...formData,
                 userId: selectedUser.id,
                 userEmail: selectedUser.email,
@@ -112,12 +113,15 @@ export default function AdminAddLeavePage() {
                 department: selectedUser.department || "-",
                 designation: selectedUser.designation || "-",
                 leaveValue,
-                status: "Approved", // Auto-approve admin added leaves
-                approvedBy: "Admin",
-                approvedAt: serverTimestamp(),
+                status: statusOption,
                 createdAt: serverTimestamp(),
                 isAdminEntry: true
             };
+
+            if (statusOption === "Approved") {
+                dataToSave.approvedBy = "Admin";
+                dataToSave.approvedAt = serverTimestamp();
+            }
 
             await addDoc(collection(db, "leaves"), dataToSave);
 
@@ -133,6 +137,7 @@ export default function AdminAddLeavePage() {
                 reason: "",
                 description: "",
             });
+            setStatusOption("Pending");
             // Optional: Deselect user
             // setSelectedUser(null);
 
@@ -149,7 +154,7 @@ export default function AdminAddLeavePage() {
             <div className="max-w-2xl mx-auto pb-10">
                 <div className="mb-6 px-1">
                     <h1 className="text-xl md:text-2xl font-bold text-gray-900">Add Staff Leave</h1>
-                    <p className="text-sm text-gray-500">Manually record a leave for a staff member. Automatically approved.</p>
+                    <p className="text-sm text-gray-500">Manually record a leave for a staff member with either Approved or Pending status.</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6 bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-gray-100">
@@ -269,8 +274,47 @@ export default function AdminAddLeavePage() {
                         />
                     </div>
 
+                    {/* Radio Button Options for Leave Status */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Leave Status</label>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <label className={`flex-1 flex items-center justify-between rounded-xl border px-4 py-2.5 shadow-sm cursor-pointer select-none transition-all ${
+                                statusOption === "Pending" 
+                                    ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20" 
+                                    : "border-gray-300 bg-white hover:border-gray-400"
+                            }`}>
+                                <span className="text-sm font-medium text-gray-900">Pending (Needs workflow approval)</span>
+                                <input
+                                    type="radio"
+                                    name="statusOption"
+                                    value="Pending"
+                                    checked={statusOption === "Pending"}
+                                    onChange={() => setStatusOption("Pending")}
+                                    className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                                    style={{ accentColor: "#2563eb" }}
+                                />
+                            </label>
+                            <label className={`flex-1 flex items-center justify-between rounded-xl border px-4 py-2.5 shadow-sm cursor-pointer select-none transition-all ${
+                                statusOption === "Approved" 
+                                    ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/20" 
+                                    : "border-gray-300 bg-white hover:border-gray-400"
+                            }`}>
+                                <span className="text-sm font-medium text-gray-900">Approved (Auto-approve)</span>
+                                <input
+                                    type="radio"
+                                    name="statusOption"
+                                    value="Approved"
+                                    checked={statusOption === "Approved"}
+                                    onChange={() => setStatusOption("Approved")}
+                                    className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                                    style={{ accentColor: "#2563eb" }}
+                                />
+                            </label>
+                        </div>
+                    </div>
+
                     <div className="bg-blue-50 p-4 rounded-xl flex justify-between items-center border border-blue-100">
-                        <span className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Total Days to Deduct:</span>
+                        <span className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Total Days:</span>
                         <span className="text-xl font-black text-blue-800">{calculateLeaveValue()}</span>
                     </div>
 
@@ -292,7 +336,7 @@ export default function AdminAddLeavePage() {
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                                 Adding Leave...
                             </span>
-                        ) : "Submit & Approve Leave"}
+                        ) : statusOption === "Approved" ? "Submit & Approve Leave" : "Submit Leave as Pending"}
                     </button>
 
                 </form>

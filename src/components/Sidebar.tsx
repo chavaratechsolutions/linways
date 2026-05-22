@@ -101,7 +101,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             { name: "Register Staff", href: "/admin/register", icon: UserPlus },
             { name: "Register Multiple Staffs", href: "/admin/register-multi", icon: UserPlus },
             { name: "Add Leave", href: "/admin/add-leave", icon: FilePlus },
-            { name: "Bulk Leave Upload", href: "/admin/leaves/bulk", icon: FileUp }
+            { name: "Bulk Leave Upload", href: "/admin/leaves/bulk", icon: FileUp },
+            { name: "Upload Salary Slip", href: "/admin/upload-salary-slip", icon: FileUp }
         );
     } else if (role === "hod" || role === "princi" || role === "dir") {
         adminLinks.push({

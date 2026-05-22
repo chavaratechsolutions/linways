@@ -70,6 +70,12 @@ service cloud.firestore {
       );
     }
 
+    // Rules for the 'salary_slips' collection
+    match /salary_slips/{userId} {
+      allow read: if isAuthenticated() && (userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
     // Rules for the 'compLeaveGrants' collection
     match /compLeaveGrants/{grantId} {
       // Staff can read their own grants; HODs and admins can read all
