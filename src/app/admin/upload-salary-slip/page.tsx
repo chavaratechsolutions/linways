@@ -28,7 +28,7 @@ export default function UploadSalarySlip() {
             try {
                 const q = query(collection(db, "users"), where("role", "in", ["staff", "princi", "dir", "hod"]));
                 const snapshot = await getDocs(q);
-                const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
                 setUsers(fetchedUsers);
                 
                 // Extract unique departments
