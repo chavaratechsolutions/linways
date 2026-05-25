@@ -20,7 +20,7 @@ export default function HodDashboard() {
     });
     const [loading, setLoading] = useState(true);
     const [myLeaves, setMyLeaves] = useState<any[]>([]);
-    const [compLeaveInfo, setCompLeaveInfo] = useState<{ granted: number; minGrantSeconds: number }>({ granted: 0, minGrantSeconds: Infinity });
+    const [allCompGrants, setAllCompGrants] = useState<{ id: string; days: number; expiresAt: number }[]>([]);
 
     useEffect(() => {
         if (!db || !user || !userData?.department) return;
@@ -95,26 +95,22 @@ export default function HodDashboard() {
         const fetchCompLeave = async () => {
             try {
                 const COMP_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000;
-                const now = Date.now();
                 const q = query(
                     collection(db, "compLeaveGrants"),
                     where("staffId", "==", user.uid),
                     where("status", "==", "Approved")
                 );
                 const snap = await getDocs(q);
-                const validDocs = snap.docs.filter(d => {
+                const grants = snap.docs.map(d => {
                     const data = d.data();
                     const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
-                    return (workDateMs + COMP_VALIDITY_MS) >= now;
+                    return {
+                        id: d.id,
+                        days: data.grantedDays || 0,
+                        expiresAt: workDateMs + COMP_VALIDITY_MS
+                    };
                 });
-                const total = validDocs.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
-                const minGrantSeconds = validDocs.length > 0
-                    ? Math.min(...validDocs.map(d => {
-                        const data = d.data();
-                        return data.date ? new Date(data.date).getTime() / 1000 : (data.createdAt?.seconds ?? Infinity);
-                    }))
-                    : Infinity;
-                setCompLeaveInfo({ granted: total, minGrantSeconds });
+                setAllCompGrants(grants);
             } catch (err) {
                 console.error("Failed to fetch comp leave grants:", err);
             }
@@ -175,27 +171,38 @@ export default function HodDashboard() {
                                     if (l.type !== type || l.status === 'Rejected') return false;
                                     if (l.fromDate && new Date(l.fromDate).getFullYear() !== currentYear) return false;
                                     if (type === "Compensatory Leave") {
-                                        const createdSec = l.createdAt?.seconds ?? 0;
-                                        return createdSec >= compLeaveInfo.minGrantSeconds;
+                                        return (l.fromDate || "") >= "2026-03-25";
                                     }
                                     return true;
                                 })
                                 .reduce((acc, curr) => acc + (curr.leaveValue || 0), 0);
 
-                            const effectiveLimit = type === "Compensatory Leave" ? compLeaveInfo.granted : limit;
+                            const effectiveLimit = type === "Compensatory Leave" ? 0 : limit;
                             const percentage = effectiveLimit > 0 ? Math.min((used / effectiveLimit) * 100, 100) : 0;
                             const isNearLimit = effectiveLimit > 0 && percentage >= 80;
 
                             if (type === "Compensatory Leave") {
-                                const remaining = Math.max(0, effectiveLimit - used);
+                                const sortedGrants = [...allCompGrants].sort((a, b) => a.expiresAt - b.expiresAt);
+                                let remainingUsed = used;
+                                const grantsList = sortedGrants.map(g => {
+                                    const deduct = Math.min(g.days, remainingUsed);
+                                    remainingUsed -= deduct;
+                                    return { ...g, available: g.days - deduct };
+                                });
+                                const now = Date.now();
+                                const trueRemaining = grantsList
+                                    .filter(g => g.expiresAt >= now)
+                                    .reduce((sum, g) => sum + g.available, 0);
+                                const hasValidGrants = sortedGrants.some(g => g.expiresAt >= now);
+
                                 return (
                                     <div key={type} className="bg-gray-50 rounded-lg p-3 border border-gray-100 flex flex-col justify-between min-h-[76px]">
                                         <span className="text-sm font-medium text-gray-700 leading-tight mb-2 whitespace-normal break-words" title={type}>{type}</span>
                                         <div className="flex items-center gap-2 mt-auto">
                                             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-                                                {remaining} Remaining
+                                                {trueRemaining} Remaining
                                             </span>
-                                            {effectiveLimit === 0 && (
+                                            {!hasValidGrants && (
                                                 <span className="text-[10px] text-gray-400 italic">No valid grants</span>
                                             )}
                                         </div>

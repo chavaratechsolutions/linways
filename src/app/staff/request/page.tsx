@@ -47,15 +47,6 @@ export default function LeaveRequestPage() {
                 );
                 const grantsSnap = await getDocs(grantsQ);
 
-                // Only count grants still within 90-day validity window
-                const validGrants = grantsSnap.docs.filter(d => {
-                    const data = d.data();
-                    const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
-                    return (workDateMs + COMP_VALIDITY_MS) >= now;
-                });
-
-                const totalGranted = validGrants.reduce((sum, d) => sum + (d.data().grantedDays || 0), 0);
-
                 // Count comp leaves taken from 25 March 2026 onwards
                 const usedQ = query(
                     collection(db, "leaves"),
@@ -72,7 +63,7 @@ export default function LeaveRequestPage() {
 
                 // Build detailed list of individual grants for the UI
                 let remainingUsed = totalUsed;
-                const sortedValidGrants = validGrants
+                const allGrants = grantsSnap.docs
                     .map(d => {
                         const data = d.data();
                         const days = data.grantedDays || 0;
@@ -82,16 +73,18 @@ export default function LeaveRequestPage() {
                     })
                     .sort((a, b) => a.expiresAt - b.expiresAt); // Oldest expiry first
 
-                const grantsList = sortedValidGrants.map(g => {
-                    // Deduct used leaves proportionally from older grants first
+                const grantsListAfterDeduction = allGrants.map(g => {
                     const deduct = Math.min(g.days, remainingUsed);
                     remainingUsed -= deduct;
                     return { ...g, available: g.days - deduct };
-                }).filter(g => g.available > 0); // Only keep grants that still have available days
+                });
+
+                const grantsList = grantsListAfterDeduction.filter(g => g.expiresAt >= now && g.available > 0);
+                const trueRemaining = grantsList.reduce((sum, g) => sum + g.available, 0);
 
                 const nearestExpiryMs = grantsList.length > 0 ? grantsList[0].expiresAt : null;
 
-                setCompLeaveBalance({ granted: totalGranted, used: totalUsed, nearestExpiryMs, grantsList });
+                setCompLeaveBalance({ granted: trueRemaining, used: 0, nearestExpiryMs, grantsList });
             } catch (err) {
                 console.error("Failed to fetch comp leave balance:", err);
             }
@@ -422,9 +415,6 @@ export default function LeaveRequestPage() {
                                             {!allExpired && (
                                                 <span className="font-bold">
                                                     {available} day(s) available
-                                                    <span className="font-normal ml-1 opacity-70">
-                                                        ({compLeaveBalance.used} used / {compLeaveBalance.granted} granted)
-                                                    </span>
                                                 </span>
                                             )}
                                         </div>
