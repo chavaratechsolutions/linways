@@ -229,6 +229,23 @@ function StaffDashboardContent() {
                                 const percentage = effectiveLimit > 0 ? Math.min((used / effectiveLimit) * 100, 100) : 0;
                                 const isNearLimit = effectiveLimit > 0 && percentage >= 80;
 
+                                if (type === "Compensatory Leave") {
+                                    const remaining = Math.max(0, effectiveLimit - used);
+                                    return (
+                                        <div key={type} className="bg-gray-50 rounded-lg p-3 border border-gray-100 flex flex-col justify-between min-h-[76px]">
+                                            <span className="text-sm font-medium text-gray-700 leading-tight mb-2 whitespace-normal break-words" title={type}>{type}</span>
+                                            <div className="flex items-center gap-2 mt-auto">
+                                                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                                                    {remaining} Remaining
+                                                </span>
+                                                {effectiveLimit === 0 && (
+                                                    <span className="text-[10px] text-gray-400 italic">No valid grants</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
                                 return (
                                     <div key={type} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                                         <div className="flex justify-between items-center mb-2">
@@ -243,9 +260,6 @@ function StaffDashboardContent() {
                                                 style={{ width: `${percentage}%` }}
                                             ></div>
                                         </div>
-                                        {type === "Compensatory Leave" && effectiveLimit === 0 && (
-                                            <p className="text-[10px] text-gray-400 italic mt-1">No grants yet</p>
-                                        )}
                                     </div>
                                 );
                             })}
