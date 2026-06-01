@@ -5,9 +5,10 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import EditStaffModal from "./EditStaffModal";
-import { Users, AlertCircle, Calendar, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, AlertCircle, Calendar, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
 import { format, startOfYear, endOfYear } from "date-fns";
 import { LEAVE_LIMITS, LeaveType, COMP_VALIDITY_MS } from "@/lib/constants";
+import * as XLSX from "xlsx";
 
 
 interface StaffData {
@@ -229,6 +230,53 @@ export default function AdminStaffOverview() {
         return sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 text-blue-600 ml-1" /> : <ArrowDown className="h-4 w-4 text-blue-600 ml-1" />;
     };
 
+    const handleExport = () => {
+        const currentYear = new Date().getFullYear();
+        const yearStart = format(startOfYear(new Date()), "yyyy-MM-dd");
+        const yearEnd = format(endOfYear(new Date()), "yyyy-MM-dd");
+
+        const exportData = sortedAndFilteredStaffs.map((staff, index) => {
+            const userLeaves = rawLeaves.filter(l => l.userId === staff.id && l.fromDate >= yearStart && l.fromDate <= yearEnd);
+            
+            const monthlyCasualLeaves = Array(12).fill(0);
+            let totalCasual = 0;
+
+            userLeaves.forEach(leave => {
+                if (leave.fromDate && leave.type === "Casual Leave") {
+                    const leaveMonth = new Date(leave.fromDate).getMonth();
+                    monthlyCasualLeaves[leaveMonth] += (leave.leaveValue || 0);
+                    totalCasual += (leave.leaveValue || 0);
+                }
+            });
+
+            return {
+                "Sl. No": index + 1,
+                "Employee Name": staff.displayName,
+                "Department": staff.department || "-",
+                "Designation": staff.designation || "-",
+                "Role": getDisplayRole(staff.role),
+                "Jan": monthlyCasualLeaves[0],
+                "Feb": monthlyCasualLeaves[1],
+                "Mar": monthlyCasualLeaves[2],
+                "Apr": monthlyCasualLeaves[3],
+                "May": monthlyCasualLeaves[4],
+                "Jun": monthlyCasualLeaves[5],
+                "Jul": monthlyCasualLeaves[6],
+                "Aug": monthlyCasualLeaves[7],
+                "Sep": monthlyCasualLeaves[8],
+                "Oct": monthlyCasualLeaves[9],
+                "Nov": monthlyCasualLeaves[10],
+                "Dec": monthlyCasualLeaves[11],
+                "Total Casual Leave": totalCasual,
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Staff Leaves");
+        XLSX.writeFile(wb, `Staff_Leave_Report_${currentYear}.xlsx`);
+    };
+
 
     return (
         <DashboardLayout allowedRole="admin">
@@ -244,17 +292,26 @@ export default function AdminStaffOverview() {
                         </p> */}
                     </div>
 
-                    <div className="relative w-full md:w-72">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="h-5 w-5 text-gray-400" />
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="relative flex-1 md:w-72">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search staff..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow shadow-sm"
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Search staff..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow shadow-sm"
-                        />
+                        <button
+                            onClick={handleExport}
+                            className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl hover:bg-green-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap shrink-0"
+                        >
+                            <Download className="h-4 w-4" />
+                            <span className="hidden md:inline">Export</span>
+                        </button>
                     </div>
                 </div>
 

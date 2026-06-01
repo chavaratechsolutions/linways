@@ -3,12 +3,13 @@
 import { useEffect, useState, Suspense } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { db } from "@/lib/firebase";
-import { collection, query, onSnapshot, doc, updateDoc, where } from "firebase/firestore";
+import { collection, query, onSnapshot, doc, updateDoc, where, deleteDoc } from "firebase/firestore";
 import { format, startOfYear, endOfYear } from "date-fns";
-import { Check, X, AlertCircle, CalendarClock, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Check, X, AlertCircle, CalendarClock, Search, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Timestamp } from "firebase/firestore";
 import { LEAVE_LIMITS, LeaveType, COMP_VALIDITY_MS } from "@/lib/constants";
+import AdminEditLeaveModal from "./AdminEditLeaveModal";
 
 interface LeaveRequest {
     id: string;
@@ -43,6 +44,7 @@ function AdminRequestManagerContent() {
     const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected" | "Recommended">(statusParam as any);
     const [searchTerm, setSearchTerm] = useState("");
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'fromDate', direction: 'desc' });
+    const [editingLeave, setEditingLeave] = useState<LeaveRequest | null>(null);
 
     useEffect(() => {
         if (["All", "Pending", "Approved", "Rejected", "Recommended"].includes(statusParam)) {
@@ -111,6 +113,18 @@ function AdminRequestManagerContent() {
         } catch (error) {
             console.error("Error updating leave:", error);
             alert("Failed to update status.");
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (window.confirm("Are you sure you want to delete this leave request? This action cannot be undone.")) {
+            try {
+                const leaveRef = doc(db, "leaves", id);
+                await deleteDoc(leaveRef);
+            } catch (error) {
+                console.error("Error deleting leave:", error);
+                alert("Failed to delete leave request.");
+            }
         }
     };
 
@@ -283,22 +297,38 @@ function AdminRequestManagerContent() {
                                     <div className="text-xs text-gray-400">
                                         {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
                                     </div>
-                                    {(leave.status === "Pending" || leave.status === "Recommended") && (
-                                        <div className="flex gap-2 pt-2 border-t border-gray-100">
-                                            <button
-                                                onClick={() => handleAction(leave.id, "Approved")}
-                                                className="flex-1 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors"
-                                            >
-                                                Approve
-                                            </button>
-                                            <button
-                                                onClick={() => handleAction(leave.id, "Rejected")}
-                                                className="flex-1 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
-                                            >
-                                                Reject
-                                            </button>
-                                        </div>
-                                    )}
+                                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                                        {(leave.status === "Pending" || leave.status === "Recommended") && (
+                                            <>
+                                                <button
+                                                    onClick={() => handleAction(leave.id, "Approved")}
+                                                    className="flex-1 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAction(leave.id, "Rejected")}
+                                                    className="flex-1 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </>
+                                        )}
+                                        <button
+                                            onClick={() => setEditingLeave(leave)}
+                                            className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-colors flex items-center gap-1 justify-center"
+                                            title="Edit Request"
+                                        >
+                                            <Pencil className="h-3 w-3" /> Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(leave.id)}
+                                            className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 transition-colors flex items-center gap-1 justify-center"
+                                            title="Delete Request"
+                                        >
+                                            <Trash2 className="h-3 w-3" /> Delete
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })
@@ -311,7 +341,7 @@ function AdminRequestManagerContent() {
                             <thead className="bg-gray-50 border-b border-gray-100">
                                 <tr>
                                     <th
-                                        className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                        className="px-3 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
                                         onClick={() => handleSort('displayName')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -321,9 +351,9 @@ function AdminRequestManagerContent() {
                                             ) : <ArrowUpDown className="h-3 w-3 text-gray-400" />}
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-center">Remaining Balance</th>
+                                    <th className="px-3 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-center">Remaining Balance</th>
                                     <th
-                                        className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                        className="px-3 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
                                         onClick={() => handleSort('type')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -333,9 +363,9 @@ function AdminRequestManagerContent() {
                                             ) : <ArrowUpDown className="h-3 w-3 text-gray-400" />}
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Reason & Details</th>
+                                    <th className="px-3 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">Reason & Details</th>
                                     <th
-                                        className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                        className="px-3 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
                                         onClick={() => handleSort('fromDate')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -346,7 +376,7 @@ function AdminRequestManagerContent() {
                                         </div>
                                     </th>
                                     <th
-                                        className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                        className="px-3 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
                                         onClick={() => handleSort('status')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -356,20 +386,20 @@ function AdminRequestManagerContent() {
                                             ) : <ArrowUpDown className="h-3 w-3 text-gray-400" />}
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-right">Actions</th>
+                                    <th className="px-3 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-nowrap text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
-                                    <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading requests...</td></tr>
+                                    <tr><td colSpan={7} className="px-3 py-12 text-center text-gray-400">Loading requests...</td></tr>
                                 ) : sortedFilteredLeaves.length === 0 ? (
-                                    <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 py-16">No {filter.toLowerCase()} requests found.</td></tr>
+                                    <tr><td colSpan={7} className="px-3 py-12 text-center text-gray-400 py-16">No {filter.toLowerCase()} requests found.</td></tr>
                                 ) : (
                                     sortedFilteredLeaves.map((leave) => {
                                         const staff = staffMap[leave.userId];
                                         return (
                                             <tr key={leave.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4">
+                                                <td className="px-3 py-3">
                                                     <div>
                                                         <span className="text-sm font-bold text-gray-900 block">
                                                             {staff ? `${staff.salutation || ""} ${staff.displayName}` : leave.userEmail}
@@ -379,7 +409,7 @@ function AdminRequestManagerContent() {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-center">
+                                                <td className="px-3 py-3 text-center">
                                                     {(() => {
                                                         const currentYear = new Date().getFullYear();
                                                         const yearStart = format(startOfYear(new Date()), "yyyy-MM-dd");
@@ -426,21 +456,21 @@ function AdminRequestManagerContent() {
                                                         );
                                                     })()}
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-3 py-3">
                                                     <div className="text-sm font-medium text-gray-900">{leave.type}</div>
                                                     <div className="text-xs text-blue-600 font-semibold uppercase">{leave.leaveValue} Day(s) - {leave.session}</div>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="min-w-[200px] max-w-sm">
+                                                <td className="px-3 py-3">
+                                                    <div className="min-w-[150px] max-w-[250px]">
                                                         <p className="text-sm text-gray-900 font-medium break-words" title={leave.reason}>{leave.reason}</p>
                                                         <p className="text-xs text-gray-500 mt-0.5 break-words" title={leave.description}>{leave.description}</p>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">
+                                                <td className="px-3 py-3 text-sm text-gray-600">
                                                     {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")}
                                                     {leave.toDate && leave.toDate !== leave.fromDate && ` - ${format(new Date(leave.toDate), "MMM dd")}`}
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-3 py-3">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${leave.status === "Approved" ? "bg-green-100 text-green-700 border-green-200" :
                                                         leave.status === "Rejected" ? "bg-red-100 text-red-700 border-red-200" :
                                                             leave.status === "Recommended" ? "bg-blue-100 text-blue-700 border-blue-200" :
@@ -449,19 +479,19 @@ function AdminRequestManagerContent() {
                                                         {leave.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex justify-end gap-2">
+                                                <td className="px-3 py-3">
+                                                    <div className="flex justify-end gap-1 items-center">
                                                         {(leave.status === "Pending" || leave.status === "Recommended") ? (
                                                             <>
                                                                 <button
                                                                     onClick={() => handleAction(leave.id, "Approved")}
-                                                                    className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors"
+                                                                    className="px-2 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors"
                                                                 >
                                                                     Approve
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleAction(leave.id, "Rejected")}
-                                                                    className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                                    className="px-2 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
                                                                 >
                                                                     Reject
                                                                 </button>
@@ -469,6 +499,20 @@ function AdminRequestManagerContent() {
                                                         ) : (
                                                             <span className="text-xs text-gray-400 italic">Actioned</span>
                                                         )}
+                                                        <button
+                                                            onClick={() => setEditingLeave(leave)}
+                                                            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-colors"
+                                                            title="Edit Request"
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(leave.id)}
+                                                            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+                                                            title="Delete Request"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -479,6 +523,13 @@ function AdminRequestManagerContent() {
                         </table>
                     </div>
                 </div>
+
+                {editingLeave && (
+                    <AdminEditLeaveModal
+                        leave={editingLeave}
+                        onClose={() => setEditingLeave(null)}
+                    />
+                )}
             </div>
         </DashboardLayout>
     );
