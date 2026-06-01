@@ -25,7 +25,7 @@ export default function LeaveRequestPage() {
         granted: number;
         used: number;
         nearestExpiryMs: number | null;
-        grantsList: { id: string; days: number; expiresAt: number; available: number }[];
+        grantsList: { id: string; days: number; expiresAt: number; available: number; reason?: string }[];
     } | null>(null);
     const [leaveBalance, setLeaveBalance] = useState<{ used: number; limit: number } | null>(null);
     const isCompLeave = formData.type === "Compensatory Leave";
@@ -69,7 +69,7 @@ export default function LeaveRequestPage() {
                         const days = data.grantedDays || 0;
                         const workDateMs = data.date ? new Date(data.date).getTime() : (data.createdAt?.seconds ?? 0) * 1000;
                         const expiresAt = workDateMs + COMP_VALIDITY_MS;
-                        return { id: d.id, days, expiresAt };
+                        return { id: d.id, days, expiresAt, reason: data.reason || "" };
                     })
                     .sort((a, b) => a.expiresAt - b.expiresAt); // Oldest expiry first
 
@@ -428,11 +428,18 @@ export default function LeaveRequestPage() {
                                                     const dateStr = new Date(g.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
                                                     return (
-                                                        <div key={g.id} className="flex justify-between items-center bg-white/40 px-2 py-1 rounded">
-                                                            <span className="font-semibold">{g.available} day(s)</span>
-                                                            <span className={isExpiringSoon ? "text-yellow-700 font-bold" : "opacity-80"}>
-                                                                {isExpiringSoon ? `⚠ Expires in ${daysUntilExpiry}d (${dateStr})` : `Valid until ${dateStr}`}
-                                                            </span>
+                                                        <div key={g.id} className="flex flex-col bg-white/40 px-3 py-2 rounded gap-0.5">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="font-semibold text-sm">{g.available} day(s)</span>
+                                                                <span className={isExpiringSoon ? "text-yellow-700 font-bold text-xs" : "text-indigo-900/80 text-xs"}>
+                                                                    {isExpiringSoon ? `⚠ Expires in ${daysUntilExpiry}d (${dateStr})` : `Valid until ${dateStr}`}
+                                                                </span>
+                                                            </div>
+                                                            {g.reason && (
+                                                                <span className="text-xs text-indigo-900/70 italic break-words mt-0.5" title={g.reason}>
+                                                                    Reason: {g.reason}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
