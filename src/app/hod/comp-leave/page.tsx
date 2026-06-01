@@ -11,9 +11,12 @@ import {
     addDoc,
     serverTimestamp,
     orderBy,
+    getDocs,
+    deleteDoc,
+    doc,
 } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
-import { CheckCircle, XCircle, FileCheck, AlertCircle, X } from "lucide-react";
+import { CheckCircle, XCircle, FileCheck, AlertCircle, X, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface StaffOption {
@@ -120,6 +123,18 @@ export default function ManageCompLeavePage() {
         setTimeout(() => setToast(null), 3500);
     };
 
+    const handleDelete = async (id: string) => {
+        if (window.confirm("Are you sure you want to delete this compensatory leave grant? This action cannot be undone.")) {
+            try {
+                await deleteDoc(doc(db, "compLeaveGrants", id));
+                showToast("success", "Grant deleted successfully.");
+            } catch (err) {
+                console.error("Error deleting grant:", err);
+                showToast("error", "Failed to delete grant.");
+            }
+        }
+    };
+
     const handleAction = async (action: "Approved" | "Rejected") => {
         if (!user || !userData?.department) return;
         if (!form.staffId) { showToast("error", "Please select a staff member."); return; }
@@ -127,10 +142,25 @@ export default function ManageCompLeavePage() {
         if (!form.reason.trim()) { showToast("error", "Please enter a reason."); return; }
         if (!form.docSubmitted) { showToast("error", "Please indicate if a document was submitted."); return; }
 
-        const selectedStaff = staffList.find((s) => s.id === form.staffId);
-
         setSubmitting(true);
         try {
+            if (action === "Approved") {
+                const duplicateCheckQ = query(
+                    collection(db, "compLeaveGrants"),
+                    where("staffId", "==", form.staffId),
+                    where("date", "==", form.date),
+                    where("status", "==", "Approved")
+                );
+                const duplicateSnap = await getDocs(duplicateCheckQ);
+                if (!duplicateSnap.empty) {
+                    showToast("error", "This staff member already has an approved compensatory leave for this date.");
+                    setSubmitting(false);
+                    return;
+                }
+            }
+
+            const selectedStaff = staffList.find((s) => s.id === form.staffId);
+
             await addDoc(collection(db, "compLeaveGrants"), {
                 staffId: form.staffId,
                 staffName: selectedStaff ? `${selectedStaff.salutation || ""} ${selectedStaff.displayName}`.trim() : form.staffId,
@@ -346,14 +376,23 @@ export default function ManageCompLeavePage() {
                                                     <p className="font-semibold text-sm text-gray-900">{g.staffName}</p>
                                                     <p className="text-xs text-gray-500">{g.date ? format(new Date(g.date), "MMM dd, yyyy") : "-"}</p>
                                                 </div>
-                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${g.status === "Approved"
-                                                    ? isExpired
-                                                        ? "bg-gray-100 text-gray-500 border-gray-200"
-                                                        : "bg-green-50 text-green-700 border-green-200"
-                                                    : "bg-red-50 text-red-700 border-red-200"
-                                                    }`}>
-                                                    {g.status === "Approved" ? `+${g.grantedDays} Day` : "Rejected"}
-                                                </span>
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${g.status === "Approved"
+                                                        ? isExpired
+                                                            ? "bg-gray-100 text-gray-500 border-gray-200"
+                                                            : "bg-green-50 text-green-700 border-green-200"
+                                                        : "bg-red-50 text-red-700 border-red-200"
+                                                        }`}>
+                                                        {g.status === "Approved" ? `+${g.grantedDays} Day` : "Rejected"}
+                                                    </span>
+                                                    <button 
+                                                        onClick={() => handleDelete(g.id)}
+                                                        className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-md transition-colors inline-flex"
+                                                        title="Delete Grant"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
                                             </div>
                                             <p className="text-xs text-gray-600">{g.reason}</p>
                                             <p className="text-[10px] text-gray-400">Doc submitted: {g.docSubmitted ? "Yes" : "No"}</p>
@@ -384,6 +423,7 @@ export default function ManageCompLeavePage() {
                                             <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Doc Submitted</th>
                                             <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Status / Days</th>
                                             <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Expiry</th>
+                                            <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -430,6 +470,15 @@ export default function ManageCompLeavePage() {
                                                         ) : (
                                                             <span className="text-xs text-gray-300">—</span>
                                                         )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button 
+                                                            onClick={() => handleDelete(g.id)}
+                                                            className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg transition-colors inline-flex"
+                                                            title="Delete Grant"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             );

@@ -89,8 +89,8 @@ service cloud.firestore {
         getUserData().role == 'admin'
       );
 
-      // No one can update or delete a grant once created (immutable audit trail)
-      allow update, delete: if getUserData().role == 'admin';
+      // Admins can update/delete any grant. HODs can update/delete grants they created.
+      allow update, delete: if getUserData().role == 'admin' || (getUserData().role == 'hod' && resource.data.hodId == request.auth.uid);
     }
 
     // Rules for the 'vacationLeave' collection
