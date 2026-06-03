@@ -25,6 +25,7 @@ interface StaffData {
     leavesUsed: number;
     leaveBalances: Record<string, number>;
     role?: string;
+    extraCasualLeaves?: number;
 }
 
 type SortKey = 'displayName' | 'role' | 'designation' | 'department' | 'email' | 'remaining';
@@ -121,7 +122,8 @@ export default function AdminStaffOverview() {
                     const used = userYearLeaves
                         .filter(l => l.type === type)
                         .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
-                    balances[type] = Math.max(0, limit - used);
+                    const extra = type === "Casual Leave" ? (user.extraCasualLeaves || 0) : 0;
+                    balances[type] = Math.max(0, limit - (used + extra));
                 }
             });
 
@@ -136,9 +138,10 @@ export default function AdminStaffOverview() {
                 service: user.service,
                 appointmentNo: user.appointmentNo,
                 status: user.status,
-                leavesUsed: userYearLeaves.reduce((sum, leave) => sum + (leave.leaveValue || 0), 0),
+                leavesUsed: userYearLeaves.reduce((sum, leave) => sum + (leave.leaveValue || 0), 0) + (user.extraCasualLeaves || 0),
                 leaveBalances: balances,
-                role: user.role || "staff"
+                role: user.role || "staff",
+                extraCasualLeaves: user.extraCasualLeaves || 0
             };
         });
 

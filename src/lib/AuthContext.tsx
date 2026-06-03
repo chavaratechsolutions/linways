@@ -11,6 +11,7 @@ interface UserData {
     designation?: string;
     department?: string;
     gender?: string;
+    extraCasualLeaves?: number;
 }
 
 interface AuthContextType {
@@ -55,7 +56,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                                     name: data.name || data.displayName || user.displayName,
                                     designation: data.designation,
                                     department: data.department,
-                                    gender: data.gender
+                                    gender: data.gender,
+                                    extraCasualLeaves: data.extraCasualLeaves || 0
                                 });
                             }
                         } else {

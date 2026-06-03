@@ -40,7 +40,7 @@ export default function LeaveRequestPage() {
                     where("type", "==", currentType)
                 );
                 const snap = await getDocs(q);
-                const used = snap.docs
+                let used = snap.docs
                     .filter(d => {
                         const data = d.data();
                         return data.status !== "Rejected" &&
@@ -48,6 +48,10 @@ export default function LeaveRequestPage() {
                             new Date(data.fromDate).getFullYear() === currentYear;
                     })
                     .reduce((sum, d) => sum + (d.data().leaveValue || 0), 0);
+
+                if (currentType === "Casual Leave") {
+                    used += (userData?.extraCasualLeaves || 0);
+                }
 
                 setLeaveBalance({ used, limit });
             } catch (err) {

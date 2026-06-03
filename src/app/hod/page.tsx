@@ -166,7 +166,7 @@ export default function HodDashboard() {
                             })
                             .map(([type, limit]) => {
                             const currentYear = new Date().getFullYear();
-                            const used = myLeaves
+                            let used = myLeaves
                                 .filter(l => {
                                     if (l.type !== type || l.status === 'Rejected') return false;
                                     if (l.fromDate && new Date(l.fromDate).getFullYear() !== currentYear) return false;
@@ -176,6 +176,10 @@ export default function HodDashboard() {
                                     return true;
                                 })
                                 .reduce((acc, curr) => acc + (curr.leaveValue || 0), 0);
+
+                            if (type === "Casual Leave") {
+                                used += (userData?.extraCasualLeaves || 0);
+                            }
 
                             const effectiveLimit = type === "Compensatory Leave" ? 0 : limit;
                             const percentage = effectiveLimit > 0 ? Math.min((used / effectiveLimit) * 100, 100) : 0;

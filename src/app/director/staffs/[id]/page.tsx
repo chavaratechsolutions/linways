@@ -45,7 +45,8 @@ export default function StaffDetailsPage({ params }: { params: Promise<{ id: str
         const used = approvedYearLeaves
             .filter(l => l.type === type)
             .reduce((sum, l) => sum + (l.leaveValue || 0), 0);
-        leaveBalances[type] = Math.max(0, limit - used);
+        const extra = type === "Casual Leave" ? (staff?.extraCasualLeaves || 0) : 0;
+        leaveBalances[type] = Math.max(0, limit - (used + extra));
     });
 
     const getStatusIcon = (status: string) => {

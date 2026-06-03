@@ -102,7 +102,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             { name: "Register Multiple Staffs", href: "/admin/register-multi", icon: UserPlus },
             { name: "Add Leave", href: "/admin/add-leave", icon: FilePlus },
             { name: "Bulk Leave Upload", href: "/admin/leaves/bulk", icon: FileUp },
-            { name: "Upload Salary Slip", href: "/admin/upload-salary-slip", icon: FileUp }
+            { name: "Upload Salary Slip", href: "/admin/upload-salary-slip", icon: FileUp },
+            { name: "Uncounted Leaves", href: "/admin/uncounted-leaves", icon: FilePlus }
         );
     } else if (role === "hod" || role === "princi" || role === "dir") {
         adminLinks.push({
@@ -115,7 +116,14 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     if (role === "dir") {
         adminLinks.push(
             { name: "Vacation Leave Management", href: "/director/vacation-leave-grand", icon: FilePlus },
-            { name: "Add Leave", href: "/director/add-leave", icon: FilePlus }
+            { name: "Add Leave", href: "/director/add-leave", icon: FilePlus },
+            { name: "Uncounted Leaves", href: "/director/uncounted-leaves", icon: FilePlus }
+        );
+    }
+
+    if (role === "princi") {
+        adminLinks.push(
+            { name: "Uncounted Leaves", href: "/principal/uncounted-leaves", icon: FilePlus }
         );
     }
 
