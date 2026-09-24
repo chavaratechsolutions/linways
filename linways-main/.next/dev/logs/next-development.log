@@ -1,0 +1,73 @@
+[00:43:46.446] Server  ERROR   ⨯ TurbopackInternalError: Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+
+Debug info:
+- Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+  
+  Caused by:
+      0: Unable to open static sorted file referenced from 00001344.meta
+      1: Unable to open static sorted file 00001340.sst
+      2: The system cannot find the path specified. (os error 3)
+[00:43:46.449] Server  ERROR   ⨯ TurbopackInternalError: Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+
+Debug info:
+- Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+  
+  Caused by:
+      0: Unable to open static sorted file referenced from 00001344.meta
+      1: Unable to open static sorted file 00001340.sst
+      2: The system cannot find the path specified. (os error 3)
+[00:43:49.455] Server  LOG     ○ Compiling /_error ...
+[00:44:06.267] Server  ERROR   ⨯ TurbopackInternalError: Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+
+Debug info:
+- Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+  
+  Caused by:
+      0: Unable to open static sorted file referenced from 00001344.meta
+      1: Unable to open static sorted file 00001340.sst
+      2: The system cannot find the path specified. (os error 3)
+[00:44:06.268] Server  ERROR   ⨯ TurbopackInternalError: Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+
+Debug info:
+- Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+  
+  Caused by:
+      0: Unable to open static sorted file referenced from 00001344.meta
+      1: Unable to open static sorted file 00001340.sst
+      2: The system cannot find the path specified. (os error 3)
+[00:44:06.313] Server  ERROR   ⨯ TurbopackInternalError: Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+
+Debug info:
+- Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+  
+  Caused by:
+      0: Unable to open static sorted file referenced from 00001344.meta
+      1: Unable to open static sorted file 00001340.sst
+      2: The system cannot find the path specified. (os error 3)
+[00:44:06.314] Server  ERROR   ⨯ TurbopackInternalError: Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+
+Debug info:
+- Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+  
+  Caused by:
+      0: Unable to open static sorted file referenced from 00001344.meta
+      1: Unable to open static sorted file 00001340.sst
+      2: The system cannot find the path specified. (os error 3)
+[00:44:06.854] Server  ERROR   ⨯ TurbopackInternalError: Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+
+Debug info:
+- Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+  
+  Caused by:
+      0: Unable to open static sorted file referenced from 00001344.meta
+      1: Unable to open static sorted file 00001340.sst
+      2: The system cannot find the path specified. (os error 3)
+[00:44:06.855] Server  ERROR   ⨯ TurbopackInternalError: Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+
+Debug info:
+- Failed to lookup task id: Looking up task id for CachedTaskType { native_fn: NativeFunction { name: "get_written_endpoint_with_issues_operation", global_name: "next-swc-napi@next_swc_napi::next_api::endpoint::get_written_endpoint_with_issues_operation", .. }, this: None, arg: (OperationVc { node: RawVc::TaskOutput(548) },) } from database failed
+  
+  Caused by:
+      0: Unable to open static sorted file referenced from 00001344.meta
+      1: Unable to open static sorted file 00001340.sst
+      2: The system cannot find the path specified. (os error 3)
