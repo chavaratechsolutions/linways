@@ -1,0 +1,231 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot, doc, deleteDoc } from "firebase/firestore";
+import { useAuth } from "@/lib/AuthContext";
+import { format } from "date-fns";
+import { Timestamp } from "firebase/firestore";
+
+interface LeaveRequest {
+    id: string;
+    userId: string;
+    type: string;
+    status: "Pending" | "Approved" | "Rejected" | "Recommended" | "Returned";
+    reason: string;
+    description: string;
+    fromDate: string;
+    toDate: string;
+    leaveValue: number;
+    session: string;
+    createdAt?: Timestamp;
+    recommendedBy?: string;
+    rejectedBy?: string;
+}
+import { AlertCircle } from "lucide-react";
+
+export default function StaffHistoryPage() {
+    const { user } = useAuth();
+    const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!user || !db) return;
+
+        const q = query(
+            collection(db, "leaves"),
+            where("userId", "==", user.uid)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const leavesData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as LeaveRequest[];
+
+            leavesData.sort((a, b) => {
+                const timeA = a.createdAt && typeof a.createdAt.toMillis === 'function'
+                    ? a.createdAt.toMillis()
+                    : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.fromDate || 0).getTime());
+                const timeB = b.createdAt && typeof b.createdAt.toMillis === 'function'
+                    ? b.createdAt.toMillis()
+                    : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.fromDate || 0).getTime());
+                return timeB - timeA;
+            });
+
+            setLeaves(leavesData);
+            setLoading(false);
+            setError(null);
+        }, (err) => {
+            console.error("Firestore Error:", err);
+            setError(err.message);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    const handleCancel = async (id: string) => {
+        if (!confirm("Are you sure you want to cancel this leave request? This action cannot be undone.")) return;
+        try {
+            await deleteDoc(doc(db, "leaves", id));
+        } catch (error) {
+            console.error("Error cancelling leave:", error);
+            alert("Failed to cancel the leave request. Please try again.");
+        }
+    };
+
+    const getStatusStyle = (status: string) => {
+        switch (status) {
+            case "Approved": return "bg-green-100 text-green-800 border-green-200";
+            case "Rejected": return "bg-red-100 text-red-800 border-red-200";
+            case "Recommended": return "bg-blue-100 text-blue-800 border-blue-200";
+            case "Returned": return "bg-orange-100 text-orange-800 border-orange-200";
+            default: return "bg-yellow-100 text-yellow-800 border-yellow-200";
+        }
+    };
+
+    return (
+        <DashboardLayout allowedRole="staff">
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-xl md:text-2xl font-bold text-gray-900">Leave History</h1>
+                    <p className="text-sm text-gray-500">Track your submitted leave requests.</p>
+                </div>
+
+                {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-3">
+                        <AlertCircle className="h-5 w-5 shrink-0" />
+                        <p className="text-sm">Error: {error}</p>
+                    </div>
+                )}
+
+                {/* Mobile View: Cards */}
+                <div className="grid grid-cols-1 gap-4 lg:hidden">
+                    {loading ? (
+                        <div className="text-center py-12 text-gray-400">Loading history...</div>
+                    ) : leaves.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400 italic bg-white rounded-xl border border-gray-100">
+                            No leave requests found.
+                        </div>
+                    ) : (
+                        leaves.map((leave) => (
+                            <div key={leave.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900">{leave.type}</h3>
+                                        <p className="text-xs text-gray-500">{leave.session}</p>
+                                    </div>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(leave.status)}`}>
+                                        {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "HOD Recommended") :
+                                         leave.status === "Rejected" ? (leave.rejectedBy ? `${leave.rejectedBy} Rejected` : "Rejected") : leave.status}
+                                    </span>
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                    <p className="line-clamp-2">{leave.reason}</p>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+                                    <span className="text-xs text-gray-400">
+                                        {leave.fromDate && format(new Date(leave.fromDate), "MMM dd")} - {leave.toDate && format(new Date(leave.toDate), "MMM dd")}
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-semibold text-blue-600 uppercase">
+                                            {leave.leaveValue} Day(s)
+                                        </span>
+                                        {(leave.status === "Pending" || leave.status === "Returned") && (
+                                            <>
+                                                <a
+                                                    href={`/staff/edit/${leave.id}`}
+                                                    className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                                >
+                                                    Edit
+                                                </a>
+                                                <button
+                                                    onClick={() => handleCancel(leave.id)}
+                                                    className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Desktop View: Table */}
+                <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-gray-50 border-b border-gray-100">
+                                <tr>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Duration</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Date(s)</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Reason</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {loading ? (
+                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400">Loading history...</td></tr>
+                                ) : leaves.length === 0 ? (
+                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic py-16">No leave requests found.</td></tr>
+                                ) : (
+                                    leaves.map((leave) => (
+                                        <tr key={leave.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <span className="font-medium text-gray-900">{leave.type}</span>
+                                                <div className="text-xs text-gray-500">{leave.session}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-700">
+                                                {leave.leaveValue} Day(s)
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">
+                                                {leave.fromDate && format(new Date(leave.fromDate), "MMM dd, yyyy")}
+                                                {leave.toDate && leave.toDate !== leave.fromDate && ` - ${format(new Date(leave.toDate), "MMM dd, yyyy")}`}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
+                                                {leave.reason}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(leave.status)}`}>
+                                                    {leave.status === "Recommended" ? (leave.recommendedBy ? `${leave.recommendedBy} Recommended` : "HOD Recommended") :
+                                                     leave.status === "Rejected" ? (leave.rejectedBy ? `${leave.rejectedBy} Rejected` : "Rejected") : leave.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {(leave.status === "Pending" || leave.status === "Returned") ? (
+                                                    <div className="flex justify-end gap-2">
+                                                        <a
+                                                            href={`/staff/edit/${leave.id}`}
+                                                            className="inline-block px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                                                        >
+                                                            Edit
+                                                        </a>
+                                                        <button
+                                                            onClick={() => handleCancel(leave.id)}
+                                                            className="inline-block px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 italic">No actions</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </DashboardLayout>
+    );
+}

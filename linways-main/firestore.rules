@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Function to get the user's role from their document (safely)
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Function to check if user is an admin or director or principal
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'admin' || 
+        getUserData().role == 'dir' ||
+        getUserData().role == 'princi' ||
+        getUserData().role == 'hod'
+      );
+    }
+
+    function isStaff() {
+       return isAuthenticated() && (
+        getUserData().role == 'staff' || 
+        getUserData().role == 'princi'
+      );
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Users can only read their own profile, Admins can read all
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      // ONLY admins can create or delete users
+      allow create, delete: if isAdmin();
+      
+      // Admins can update any user. Users can update their own document,
+      // but cannot change their role, email, or extra leaves.
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        request.auth.uid == userId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'email', 'extraCasualLeaves'])
+      );
+    }
+
+    // Rules for the 'exams' collection
+    match /exams/{examId} {
+      // Any authenticated user can view exams
+      allow read: if isAuthenticated();
+      
+      // Only users with 'dir' (Director) or 'admin' roles can create, update, or delete exams
+      allow write: if isAuthenticated() && (
+        getUserData().role == 'dir' ||
+        getUserData().role == 'admin'
+      );
+    }
+
+    // Rules for the 'leaves' collection
+    match /leaves/{leaveId} {
+      // Staff can read their own leaves, Admins can read all
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Staff can create leaves if:
+      // 1. They are authenticated
+      // 2. The UID matches their own
+      // 3. The initial status is 'Pending' (Prevents auto-approving their own leave)
+      allow create: if isAuthenticated() && (
+        (request.resource.data.userId == request.auth.uid && request.resource.data.status == 'Pending') ||
+        isAdmin()
+      );
+      
+      // ONLY admins can update a leave entirely (for approving/rejecting)
+      // Staff can update their own leave ONLY if:
+      // 1. The leave is currently 'Pending'
+      // 2. They are NOT trying to change the status
+      // 3. They are NOT trying to change the userId
+      allow update: if isAdmin() || (
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.userId == resource.data.userId &&
+        (
+          (resource.data.status == 'Pending' && request.resource.data.status == 'Pending') ||
+          (resource.data.status == 'Returned' && request.resource.data.status == 'Pending')
+        )
+      );
+      
+      // Admins can delete if needed, staff can delete their own only if still Pending, Recommended, or Returned
+      allow delete: if isAdmin() || (
+        resource.data.userId == request.auth.uid && 
+        (resource.data.status == 'Pending' || resource.data.status == 'Recommended' || resource.data.status == 'Returned')
+      );
+    }
+
+    // Rules for the 'salary_slips' collection
+    match /salary_slips/{userId} {
+      allow read: if isAuthenticated() && (userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Rules for the 'compLeaveGrants' collection
+    match /compLeaveGrants/{grantId} {
+      // Staff can read their own grants; HODs and admins can read all
+      allow read: if isAuthenticated() && (
+        resource.data.staffId == request.auth.uid || isAdmin()
+      );
+
+      // Only HODs and admins can create comp leave grant records
+      allow create: if isAuthenticated() && (
+        getUserData().role == 'hod' ||
+        getUserData().role == 'admin'
+      );
+
+      // Admins can update/delete any grant. HODs can update/delete grants they created.
+      allow update, delete: if getUserData().role == 'admin' || (getUserData().role == 'hod' && resource.data.hodId == request.auth.uid);
+    }
+
+    // Rules for the 'vacationLeave' collection
+    match /vacationLeave/{staffId} {
+      // Staff can read their own vacation leave status; Admins/Directors can read all
+      allow read: if isAuthenticated() && (staffId == request.auth.uid || isAdmin());
+      
+      // Only admins/directors can grant vacation leaves
+      allow write: if isAdmin();
+    }
+  }
+}
